@@ -140,28 +140,39 @@ export async function activate(context: vscode.ExtensionContext) {
                         "sequence": lectureId.value
                     }
                 });
-                const curriculumData = (JSON.parse(r.data.curriculum) as CurriculumData)[0].children;
+
+                for await (const item of await treeProvider.getChildren()) {
+                    if (item.id === "sessionState") continue;
+                    treeProvider.removeItem(item.id);
+                }
+
+                const curriculumData = r.data.curriculumData;
 
                 treeProvider.addItem(new TreeViewItem({
                     "id": "current-learn",
                     "icon": new vscode.ThemeIcon("book"),
                     "collapsibleState": vscode.TreeItemCollapsibleState.None,
-                    "label": r.data.subject
+                    "label": r.data.subject,
                 }));
-                
+
                 for (const curriculum of curriculumData) {
                     const item = new TreeViewItem({
-                        "id": curriculum.id,
-                        "label": curriculum.text,
+                        "id": curriculum.index,
+                        "label": curriculum.name,
                         "collapsibleState": vscode.TreeItemCollapsibleState.Collapsed,
                     });
                     treeProvider.addItem(item);
-                    for (const child of curriculum.children) {
+                    for (const lesson of curriculum.lessons) {
                         treeProvider.addChildren(item.id, new TreeViewItem({
-                            "id": child.id,
-                            "label": child.text,
+                            "id": lesson.index,
+                            "label": lesson.name,
                             "collapsibleState": vscode.TreeItemCollapsibleState.None,
-                            "icon": new vscode.ThemeIcon("file-code")
+                            "icon": (() => {
+                                switch (lesson.type) {
+                                    case 'contents': return new vscode.ThemeIcon("three-bars");
+                                    default: return new vscode.ThemeIcon("file-code");
+                                }
+                            })()
                         }));
                     }
                 }
@@ -169,6 +180,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
             }
+        }),
+        vscode.commands.registerCommand("goorm-ide.curriculum", async (id) => {
+
         })
     ];
 

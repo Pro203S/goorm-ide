@@ -1,35 +1,16 @@
 declare global {
-    type CurriculumData = RootNode[];
-
-    type RootNode = {
-        text: string;
-        id: string;
-        children: ChapterNode[];
+    type ContentNode = {
+        close_date: null,
+        id: string,
+        is_preview: boolean,
+        open_date: null,
+        sequence: string,
+        text: string,
+        time_set: boolean,
+        type: "contents",
+        url_slug: string,
     };
 
-    type ChapterNode = {
-        text: string;
-        id: string;
-        type: "chapter";
-        children: (ChapterNode | TutorialNode)[];
-    };
-
-    type TutorialNode = {
-        text: string;
-        id: string;
-        type: "tutorial";
-
-        sequence: number;
-        url_slug: string;
-        quiz_form: string;
-        is_preview: boolean;
-
-        // 실제 데이터에서 일부만 존재 → 여기만 optional 유지
-        time_set?: boolean;
-        open_date?: string | null;
-        close_date?: string | null;
-    };
-    
     type APILearn = {
         index: string;
         type: number;
@@ -69,7 +50,65 @@ declare global {
         estimatedTime: number;
         use_certificate: boolean;
 
-        curriculum: string; // ⚠️ JSON string (파싱 필요)
+        curriculumData: {
+            label: string;
+            index: string;
+            name: string;
+
+            isUserPermission: boolean;
+
+            allLessons: number;
+            completedLessons: number;
+
+            new: boolean;
+
+            lessons: {
+                index: string;
+                sequence: number;
+
+                urlSlug: string;
+
+                type: 'contents' | 'tutorial' | string;
+
+                name: string;
+
+                useTimeSet?: boolean;
+
+                open_date?: string | null;
+                close_date?: string | null;
+
+                isOpen: boolean;
+
+                first_access?: string;
+                last_access?: string;
+                completedAt?: string;
+
+                isSample: boolean;
+
+                state: number;
+                score: number;
+
+                create_time: string;
+
+                new: boolean;
+
+                hasSubmittedSource?: boolean;
+
+                tutorialQuizIndex?: string;
+
+                icon: string;
+
+                hasVideo: boolean;
+
+                isPreview: boolean;
+                isLocked: boolean;
+                isPrivate: boolean;
+
+                contentsCategory: string | null;
+
+                contentsType: string;
+            }[];
+        }[];
     };
 
     type InitialState = {

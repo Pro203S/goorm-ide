@@ -34,7 +34,7 @@
             {
                 "command": "goorm-ide.selectLearn",
                 "title": "강좌 선택",
-                "icon": "$(list-selection)",
+                "icon": "$(three-bars)",
                 "category": "구름EDU"
             }
         ],
