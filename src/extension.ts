@@ -160,6 +160,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         "id": curriculum.index,
                         "label": curriculum.name,
                         "collapsibleState": vscode.TreeItemCollapsibleState.Collapsed,
+                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : undefined
                     });
                     treeProvider.addItem(item);
                     for (const lesson of curriculum.lessons) {
@@ -168,6 +169,8 @@ export async function activate(context: vscode.ExtensionContext) {
                             "label": lesson.name,
                             "collapsibleState": vscode.TreeItemCollapsibleState.None,
                             "icon": (() => {
+                                if (lesson.score === 100) return new vscode.ThemeIcon("check");
+
                                 switch (lesson.type) {
                                     case 'contents': return new vscode.ThemeIcon("three-bars");
                                     default: return new vscode.ThemeIcon("file-code");
