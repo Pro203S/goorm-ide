@@ -14,12 +14,31 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "authentication": [{
+      "id": "goormIde",
+      "label": "구름EDU"
+    }],
+    "commands": [
+      {
+        "command": "goorm-ide.firstRun",
+        "title": "구름EDU 첫 세팅",
+        "category": "기본"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "goorm-ide.firstRun",
+          "when": "false"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
           "id": "goormIdeActivityBar",
           "icon": "resources/barIcon.svg",
-          "title": "구름IDE"
+          "title": "구름EDU"
         }
       ]
     },
@@ -27,11 +46,17 @@
       "goormIdeActivityBar": [
         {
           "id": "goormIdeView",
-          "name": "구름IDE",
+          "name": "구름EDU",
           "icon": "resources/barIcon.svg"
         }
       ]
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "goormIdeView",
+        "contents": "구름EDU를 VSCode에서 사용하려면 몇가지 설정을 진행해야해요.\n\n[구름EDU 설정](command:goorm-ide.firstRun)"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -53,6 +78,8 @@
   },
   "dependencies": {
     "axios": "^1.14.0",
+    "cheerio": "^1.2.0",
+    "cookie": "^1.1.1",
     "shadowly": "^1.0.6",
     "socket.io": "^4.8.3"
   }
