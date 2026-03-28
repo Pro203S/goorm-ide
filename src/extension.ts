@@ -245,24 +245,79 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
 
                 const filePath = path.join(goormTemp, name + ".c");
-                const uri = vscode.Uri.parse(filePath + "?goorm=asdf");
+                const uri = vscode.Uri.parse(filePath + "?goorm");
                 fs.writeFileSync(filePath, content, "utf-8");
 
                 const doc = await vscode.workspace.openTextDocument(uri);
 
-                const lecture = (await getInitialState(goormUrl, JSON.parse( session.accessToken))).channelLectureList.allLectures.find(v => v.sequence === sequence);
+                const lecture = (await getInitialState(goormUrl, JSON.parse(session.accessToken))).channelLectureList.allLectures.find(v => v.sequence === sequence);
                 if (!lecture) throw new Error("수업을 찾지 못했어요.");
-                console.log(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}`);
-                const initialState = await getInitialState(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}`, JSON.parse(session.accessToken));
+                const lectureInitialState = await getInitialState<LectureInitialState>(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}`, JSON.parse(session.accessToken));
+                const curriculum = lectureInitialState.lectureData.curriculumData.find(v => v.index === lectureIndex);
+                if (!curriculum) throw new Error("커리큘럼을 찾지 못했어요.");
+                const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
+                if (!lesson) throw new Error("레슨을 찾지 못했어요.");
 
-                console.log(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${initialState}/${label}`);
-                const state = await getInitialState<LessonInitialState>(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${initialState.}/${label}`, JSON.parse(session.accessToken));
-                console.log(state);
+                const state = await getInitialState<LessonInitialState>(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${lesson.sequence}/${label}`, JSON.parse(session.accessToken));
+                const quiz = state.lesson.quiz;
+
+                webviewProvider.setHTML(`<html>
+                    <head>
+                        <style>
+                            body {
+                                padding: 5px;
+                                display: flex;
+                                flex-direction: column;
+                            }
+                            .desc {
+                                display: flex;
+                                flex-direction: column;
+                                gap: 3px;
+                            }
+                            
+                            .sep {
+                                margin-top: 5px;
+                                margin-bottom: 5px;
+                                width: 100%;
+                                height: .5px;
+                                backgroud-color: #fff;
+                            }
+
+                            .desc .title {
+                                margin-left: 5px;
+                                opacity: 0.5;
+                                font-size: 0.7rem;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <span>에디터의 오른쪽 위 제출 버튼을 눌러 제출해요.</span>
+                        <div class="desc">
+                            ${quiz.contents}
+                        </div>
+                        <div class="sep"></div>
+                        <div class="desc">
+                            <span class="title">입력 예시</span>
+                            ${quiz.inputExample.map(v => `<span class="content">${v}</span>`)}
+                        </div>
+                        <div class="sep"></div>
+                        <div class="desc">
+                            <span class="title">출력 예시</span>
+                            ${quiz.outputExample.map(v => `<span class="content">${v}</span>`)}
+                        </div>
+                        <div class="sep"></div>
+                    </body>
+                </html>`);
 
                 await vscode.window.showTextDocument(doc);
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
+                vscode.commands.executeCommand(
+                    "setContext",
+                    "goorm-ide.isEditingSource",
+                    false
+                );
             }
         })
     ];
@@ -279,7 +334,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
                 return;
             }
-
 
             vscode.commands.executeCommand(
                 "setContext",

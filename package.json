@@ -44,7 +44,7 @@
             },
             {
                 "command": "goorm-ide.submitQuiz",
-                "title": "퀴즈 제출",
+                "title": "제출",
                 "category": "구름EDU"
             }
         ],

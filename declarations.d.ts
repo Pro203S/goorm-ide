@@ -544,6 +544,49 @@ declare global {
             curriculum: any[]; // 👉 이거 너무 커서 any 추천
         };
     };
+
+    type LectureInitialState = {
+        isIE: boolean;
+        locale: string;
+        contactType: string;
+        contactAppId: string;
+
+        userData: InitialState["userData"];
+
+        isChannel: boolean;
+        isChannelGroup: boolean;
+        isMobile: boolean;
+        isGit: boolean;
+        isAssessLecture: boolean;
+
+        channelData: InitialState["channelData"];
+
+        hostUrl: string;
+        serviceNotice: null;
+        currentPath: string;
+        accountHost: string;
+        isExistNoticeNew: boolean;
+
+        settings: InitialState["settings"];
+
+        useRoute: boolean;
+        useB2g: boolean;
+
+        categoryList: InitialState["categoryList"][];
+
+        lectureData: {
+            index: string;
+            name: string;
+            description: string | null;
+            thumbnail: string | null;
+            isPublic: boolean;
+            isFree: boolean;
+            isCompleted: boolean;
+            progress: number;
+
+            curriculumData: APILearn["curriculumData"];
+        };
+    }
 }
 
 export { };

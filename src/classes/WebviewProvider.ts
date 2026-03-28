@@ -22,6 +22,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     public setHTML(html: string) {
         this._html = html;
+        this.render();
     }
 
     private render() {
