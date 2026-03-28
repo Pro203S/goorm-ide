@@ -1,5 +1,3 @@
-import vscode from 'vscode';
-
 declare global {
     type InitialState = {
         isIE: boolean;

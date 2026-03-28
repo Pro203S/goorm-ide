@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import getUserData from '../modules/getUserData';
+import getUserData from '../modules/getInitialState';
 
 async function inputBox(cookieName: string) {
     const result = await vscode.window.showInputBox({

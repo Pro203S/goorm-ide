@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import TreeDataProvider from './classes/TreeDataProvider';
 import AuthenticationProvider from './classes/AuthenticationProvider';
 import TreeViewItem from './classes/TreeViewItem';
-import getUserData from './modules/getUserData';
+import getUserData from './modules/getInitialState';
 
 export async function activate(context: vscode.ExtensionContext) {
     const treeProvider = new TreeDataProvider();
