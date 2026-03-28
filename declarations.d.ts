@@ -1,9 +1,6 @@
-declare global {
-    type UserData = {
-        "goormUrl": string;
-        "session": string;
-    }
+import vscode from 'vscode';
 
+declare global {
     type InitialState = {
         isIE: boolean;
         locale: string;

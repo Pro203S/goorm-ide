@@ -5,7 +5,8 @@ async function inputBox(cookieName: string) {
     const result = await vscode.window.showInputBox({
         "ignoreFocusOut": true,
         "placeHolder": `${cookieName}의 값`,
-        "prompt": `구름 사이트의 개발자 모드에서 ${cookieName}의 쿠키 값을 입력해주세요.\n\n개발자 모드 -> 애플리케이션 -> 쿠키`
+        "prompt": `구름 사이트의 개발자 모드에서 ${cookieName}의 쿠키 값을 입력해주세요. | 개발자 모드 -> 애플리케이션 -> 쿠키`,
+        "password": true
     });
     if (!result)
         throw new Error("값이 입력되지 않았어요!");
@@ -30,7 +31,6 @@ export default class AuthenticationProvider implements vscode.AuthenticationProv
     }
 
     async createSession(): Promise<vscode.AuthenticationSession> {
-        vscode.window.showInformationMessage("구름EDU로 로그인합니다.");
         vscode.env.openExternal(vscode.Uri.parse(this.goormUrl + "/login"));
 
         const accountsSid = await inputBox("accounts.sid");

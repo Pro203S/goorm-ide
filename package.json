@@ -1,86 +1,90 @@
 {
-  "name": "goorm-ide",
-  "displayName": "goorm-ide",
-  "description": "goorm ide in vscode",
-  "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.110.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "main": "./out/extension.js",
-  "contributes": {
-    "authentication": [{
-      "id": "goormIde",
-      "label": "구름EDU"
-    }],
-    "commands": [
-      {
-        "command": "goorm-ide.firstRun",
-        "title": "구름EDU 첫 세팅",
-        "category": "기본"
-      }
+    "name": "goorm-ide",
+    "displayName": "goorm-ide",
+    "description": "goorm ide in vscode",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.110.0"
+    },
+    "categories": [
+        "Other"
     ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "goorm-ide.firstRun",
-          "when": "false"
-        }
-      ]
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "authentication": [{
+            "id": "goormIde",
+            "label": "구름EDU"
+        }],
+        "commands": [
+            {
+                "command": "goorm-ide.firstRun",
+                "title": "구름EDU 첫 세팅",
+                "category": "기본"
+            },
+            {
+                "command": "goorm-ide.Login",
+                "title": "구름EDU로 로그인",
+                "category": "계정"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "goorm-ide.firstRun",
+                    "when": "false"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "goormIdeActivityBar",
+                    "icon": "resources/barIcon.svg",
+                    "title": "구름EDU"
+                }
+            ]
+        },
+        "views": {
+            "goormIdeActivityBar": [
+                {
+                    "id": "goormIdeView",
+                    "name": "구름EDU",
+                    "icon": "resources/barIcon.svg"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "goormIdeView",
+                "contents": "구름EDU를 VSCode에서 사용하려면 몇가지 설정을 진행해야해요.\n\n[구름EDU 설정](command:goorm-ide.firstRun)\n\n만약 이미 로그인을 한 적이 있다면, 아래 버튼을 눌러주세요.\n\n[구름EDU 로그인](command:goorm-ide.Login)"
+            }
+        ]
     },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "goormIdeActivityBar",
-          "icon": "resources/barIcon.svg",
-          "title": "구름EDU"
-        }
-      ]
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
     },
-    "views": {
-      "goormIdeActivityBar": [
-        {
-          "id": "goormIdeView",
-          "name": "구름EDU",
-          "icon": "resources/barIcon.svg"
-        }
-      ]
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^25.5.0",
+        "@types/vscode": "^1.110.0",
+        "@vscode/test-cli": "^0.0.12",
+        "@vscode/test-electron": "^2.5.2",
+        "eslint": "^9.39.3",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.56.1"
     },
-    "viewsWelcome": [
-      {
-        "view": "goormIdeView",
-        "contents": "구름EDU를 VSCode에서 사용하려면 몇가지 설정을 진행해야해요.\n\n[구름EDU 설정](command:goorm-ide.firstRun)"
-      }
-    ]
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^25.5.0",
-    "@types/vscode": "^1.110.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.39.3",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
-  },
-  "dependencies": {
-    "axios": "^1.14.0",
-    "cheerio": "^1.2.0",
-    "cookie": "^1.1.1",
-    "shadowly": "^1.0.6",
-    "socket.io": "^4.8.3"
-  }
+    "dependencies": {
+        "axios": "^1.14.0",
+        "cheerio": "^1.2.0",
+        "cookie": "^1.1.1",
+        "socket.io": "^4.8.3"
+    }
 }

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import TreeDataProvider from './classes/TreeDataProvider';
 import AuthenticationProvider from './classes/AuthenticationProvider';
+import TreeViewItem from './classes/TreeViewItem';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     const treeProvider = new TreeDataProvider();
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider('goormIdeView', treeProvider)
@@ -12,6 +13,26 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.authentication.registerAuthenticationProvider("goormIde", "구름EDU", authProvider, { "supportsMultipleAccounts": false })
     );
+
+    //#region 세션 복구
+
+    const restoreSession = async () => {
+        const rawSession = await context.secrets.get("session");
+        const rawGoormUrl = await context.secrets.get("goormUrl");
+
+        if (!rawSession || !rawGoormUrl) return;
+
+        const session = JSON.parse(rawSession);
+        
+        treeProvider.addItem(new TreeViewItem({
+            "id": "session-state",
+            "label": session.account.label + "로 로그인",
+            "collapsibleState": vscode.TreeItemCollapsibleState.None,
+            "icon": new vscode.ThemeIcon("account")
+        }));
+    };
+
+    //#endregion
 
     const commands = [
         vscode.commands.registerCommand("goorm-ide.firstRun", async () => {
@@ -34,13 +55,40 @@ export function activate(context: vscode.ExtensionContext) {
 
                 authProvider.goormUrl = url;
                 const session = await authProvider.createSession();
-                console.log(session);
+
+                await context.secrets.store("session", JSON.stringify(session));
+                await context.secrets.store("goormUrl", url);
+
+                await restoreSession();
+                vscode.window.showInformationMessage("구름EDU에 로그인되었습니다.");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
             }
-        })
+        }),
+        vscode.commands.registerCommand("goorm-ide.Login", async () => {
+            try {
+                if (!await context.secrets.get("goormUrl"))
+                    throw new Error("구름 URL이 설정되지 않았어요.");
+                
+                const sessions = await authProvider.getSessions();
+                await authProvider.removeSession(sessions[0].id);
+
+                const session = await authProvider.createSession();
+
+                await context.secrets.store("session", JSON.stringify(session));
+
+                await restoreSession();
+                vscode.window.showInformationMessage("구름EDU에 로그인되었습니다.");
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+            }
+        }),
+        
     ];
+
+    await restoreSession();
 
     context.subscriptions.push(...commands);
 }
