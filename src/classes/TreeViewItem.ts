@@ -7,7 +7,7 @@ export default class TreeViewItem extends vscode.TreeItem {
         "id": string,
         "label": string,
         "description"?: string,
-        "onClick"?: string,
+        "onClick"?: vscode.Command,
         "collapsibleState": vscode.TreeItemCollapsibleState,
         "tooltip"?: string,
         "icon"?: string | vscode.IconPath,
@@ -27,11 +27,6 @@ export default class TreeViewItem extends vscode.TreeItem {
         this.contextValue = config.contextValue;
 
         if (config.onClick)
-            this.command = {
-                "command": config.onClick,
-                "title": 'Item Click',
-                "tooltip": config.tooltip,
-                "arguments": [config.id]
-            };
+            this.command = config.onClick;
     }
 }

@@ -2,16 +2,24 @@ import * as vscode from 'vscode';
 import TreeDataProvider from './classes/TreeDataProvider';
 import AuthenticationProvider from './classes/AuthenticationProvider';
 import TreeViewItem from './classes/TreeViewItem';
-import getUserData from './modules/getInitialState';
+import getInitialState from './modules/getInitialState';
 import axios from 'axios';
 import { stringifyCookie } from 'cookie';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
+import { WebviewProvider } from './classes/WebviewProvider';
 
 let loggedIn: boolean = false;
+let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
 
 export async function activate(context: vscode.ExtensionContext) {
+    if (!fs.existsSync(goormTemp))
+        fs.mkdirSync(goormTemp);
+
     const treeProvider = new TreeDataProvider();
     context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('goormIdeView', treeProvider)
+        vscode.window.registerTreeDataProvider('goormTree', treeProvider)
     );
 
     const authProvider = new AuthenticationProvider("https://sunrint-hs.goorm.io");
@@ -19,7 +27,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.authentication.registerAuthenticationProvider("goormIde", "구름EDU", authProvider, { "supportsMultipleAccounts": false })
     );
 
-    //#region 세션 복구
+    const webviewProvider = new WebviewProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider("goormDesc", webviewProvider)
+    );
+
     const restoreSession = async () => {
         try {
             const rawSession = await context.secrets.get("session");
@@ -29,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
-            await getUserData(goormUrl, JSON.parse(session.accessToken));
+            await getInitialState(goormUrl, JSON.parse(session.accessToken));
 
             loggedIn = true;
             treeProvider.addItem(new TreeViewItem({
@@ -44,7 +56,6 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage("구름EDU: " + e.message + "\n재로그인 해주세요.");
         }
     };
-    //#endregion
 
     const commands = [
         vscode.commands.registerCommand("goorm-ide.firstRun", async () => {
@@ -114,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
-                const initialState = await getUserData(goormUrl, JSON.parse(session.accessToken));
+                const initialState = await getInitialState(goormUrl, JSON.parse(session.accessToken));
                 const list = initialState.channelLectureList.allLectures;
 
                 const lectureId = await vscode.window.showQuickPick(
@@ -175,7 +186,18 @@ export async function activate(context: vscode.ExtensionContext) {
                                     case 'contents': return new vscode.ThemeIcon("three-bars");
                                     default: return new vscode.ThemeIcon("file-code");
                                 }
-                            })()
+                            })(),
+                            "onClick": {
+                                "title": lesson.name + " 문제 풀기",
+                                "command": "goorm-ide.showQuiz",
+                                "arguments": [
+                                    curriculum.index,
+                                    lesson.index,
+                                    curriculum.name + " " + lesson.name,
+                                    lectureId.value,
+                                    lesson.name
+                                ]
+                            }
                         }));
                     }
                 }
@@ -184,12 +206,99 @@ export async function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
             }
         }),
-        vscode.commands.registerCommand("goorm-ide.curriculum", async (id) => {
+        vscode.commands.registerCommand("goorm-ide.showQuiz", async (lectureIndex: string, lessonIndex: string, name: string, sequence: number, label: string) => {
+            try {
+                if (!loggedIn)
+                    throw new Error("로그인해주세요!");
 
+                const rawSession = await context.secrets.get("session");
+                const goormUrl = await context.secrets.get("goormUrl");
+
+                if (!rawSession || !goormUrl) {
+                    for await (const item of await treeProvider.getChildren()) {
+                        treeProvider.removeItem(item.id);
+                    }
+                    throw new Error("재로그인해주세요!");
+                }
+
+                const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+
+                const r = await axios.get<APIWorkspaceLesson>("https://sunrint-hs.goorm.io/api/workspace/lesson", {
+                    "withCredentials": true,
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                    },
+                    "params": {
+                        lectureIndex,
+                        lessonIndex
+                    }
+                });
+                const projects = Object.keys(r.data.result.project);
+                const project = r.data.result.project[projects[0]];
+                const file = project.files[0];
+                const content = file.content[0].source;
+
+                vscode.commands.executeCommand(
+                    "setContext",
+                    "goorm-ide.isEditingSource",
+                    true
+                );
+
+                const filePath = path.join(goormTemp, name + ".c");
+                const uri = vscode.Uri.parse(filePath + "?goorm=asdf");
+                fs.writeFileSync(filePath, content, "utf-8");
+
+                const doc = await vscode.workspace.openTextDocument(uri);
+
+                const lecture = (await getInitialState(goormUrl, JSON.parse( session.accessToken))).channelLectureList.allLectures.find(v => v.sequence === sequence);
+                if (!lecture) throw new Error("수업을 찾지 못했어요.");
+                console.log(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}`);
+                const initialState = await getInitialState(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}`, JSON.parse(session.accessToken));
+
+                console.log(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${initialState}/${label}`);
+                const state = await getInitialState<LessonInitialState>(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${initialState.}/${label}`, JSON.parse(session.accessToken));
+                console.log(state);
+
+                await vscode.window.showTextDocument(doc);
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+            }
         })
     ];
+
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(async (e) => {
+            if (!e) return;
+            const uri = e.document.uri;
+            if (!uri.query.startsWith("goorm")) {
+                vscode.commands.executeCommand(
+                    "setContext",
+                    "goorm-ide.isEditingSource",
+                    false
+                );
+                return;
+            }
+
+
+            vscode.commands.executeCommand(
+                "setContext",
+                "goorm-ide.isEditingSource",
+                true
+            );
+        }),
+        vscode.workspace.onWillSaveTextDocument((e) => {
+            e.waitUntil(new Promise(async (resolve) => {
+
+            }));
+        }),
+    );
 
     await restoreSession();
 
     context.subscriptions.push(...commands);
+}
+
+export async function deactivate() {
+    fs.rmSync(goormTemp, { "recursive": true });
 }

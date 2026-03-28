@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import getUserData from '../modules/getInitialState';
+import getInitialState from '../modules/getInitialState';
 
 async function inputBox(cookieName: string) {
     const result = await vscode.window.showInputBox({
@@ -44,7 +44,7 @@ export default class AuthenticationProvider implements vscode.AuthenticationProv
             "goorm.lang": "kor"
         };
 
-        const initialState = await getUserData(this.goormUrl, cookies);
+        const initialState = await getInitialState(this.goormUrl, cookies);
         const userData = initialState.userData;
 
         const session = {

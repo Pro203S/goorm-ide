@@ -36,6 +36,16 @@
                 "title": "강좌 선택",
                 "icon": "$(three-bars)",
                 "category": "구름EDU"
+            },
+            {
+                "command": "goorm-ide.showQuiz",
+                "title": "퀴즈 선택했을 때",
+                "category": "구름EDU"
+            },
+            {
+                "command": "goorm-ide.submitQuiz",
+                "title": "퀴즈 제출",
+                "category": "구름EDU"
             }
         ],
         "menus": {
@@ -48,7 +58,14 @@
             "view/title": [
                 {
                     "command": "goorm-ide.selectLearn",
-                    "when": "view == goormIdeView",
+                    "when": "view == goormTree",
+                    "group": "navigation"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "goorm-ide.submitQuiz",
+                    "when": "goorm-ide.isEditingSource",
                     "group": "navigation"
                 }
             ]
@@ -56,24 +73,31 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "goormIdeActivityBar",
+                    "id": "goormIde",
                     "icon": "resources/barIcon.svg",
                     "title": "구름EDU"
                 }
             ]
         },
         "views": {
-            "goormIdeActivityBar": [
+            "goormIde": [
                 {
-                    "id": "goormIdeView",
-                    "name": "구름EDU",
-                    "icon": "resources/barIcon.svg"
+                    "type": "webview",
+                    "id": "goormDesc",
+                    "name": "과제 설명",
+                    "icon": "resources/fileBars.svg",
+                    "when": "goorm-ide.isEditingSource"
+                },
+                {
+                    "id": "goormTree",
+                    "name": "과제",
+                    "icon": "resources/threeBars.svg"
                 }
             ]
         },
         "viewsWelcome": [
             {
-                "view": "goormIdeView",
+                "view": "goormIde",
                 "contents": "구름EDU를 VSCode에서 사용하려면 몇가지 설정을 진행해야해요.\n\n[구름EDU 설정](command:goorm-ide.firstRun)\n\n만약 이미 로그인을 한 적이 있다면, 아래 버튼을 눌러주세요.\n\n[구름EDU 로그인](command:goorm-ide.Login)"
             }
         ]

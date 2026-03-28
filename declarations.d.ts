@@ -111,6 +111,60 @@ declare global {
         }[];
     };
 
+    type APIWorkspaceLesson = {
+        result: {
+            removedBookmarks: string[];
+            bookmarks: string[];
+            quizIndex: string;
+            quizOutputFile: {
+                use: boolean;
+                filepath: string;
+            };
+            quizSequence: number;
+            quizUrlSlug: string;
+            quizForm: string; // programming 등
+            quizType: string; // programming 등
+            quizMode: string; // exam_mode 등
+            quizSkeletonType: string; // editor 등
+            project: {
+                [key: string]: {
+                    projectKey: string;
+
+                    language: string;
+                    langVersion: string;
+
+                    projectCode: string;
+
+                    label: string;
+
+                    mainFiletype: string;
+
+                    files: {
+                        filepath: string;
+
+                        filename: string;
+
+                        label: string;
+
+                        isDir: boolean;
+
+                        isMain: boolean;
+
+                        content: {
+                            source: string;
+
+                            readonly: boolean;
+
+                            hidden: boolean;
+                        }[];
+                    }[];
+                };
+            };
+
+            quizRunTimeLimit: number;
+        };
+    };
+
     type InitialState = {
         isIE: boolean;
         locale: string;
@@ -285,6 +339,210 @@ declare global {
 
         channelNoticeList: unknown[];
         curations: unknown[];
+    };
+
+    type LessonInitialState = {
+        isIE: boolean;
+        locale: string;
+        host: string;
+
+        userData: {
+            id: string;
+            name: string;
+            email: string;
+            language: string;
+            isTeacher: boolean;
+            isAdmin: boolean;
+            hasLoginId: boolean;
+            isDevelupUser: boolean;
+        };
+
+        channel: {
+            index: string;
+            name: string;
+            channelType: string;
+            useAssessment: boolean;
+            hideChat: boolean;
+            hideQna: boolean;
+            useTTSAudio: boolean;
+        };
+
+        isChannel: boolean;
+        isChannelGroup: boolean;
+        isMobile: boolean;
+        isGit: boolean;
+
+        collaborationRoomId: string;
+        collaborationRoomName: string;
+        isMine: boolean;
+
+        lesson: {
+            _id: string;
+            badge: {
+                name: string;
+                src: string;
+            };
+
+            completionConditionOptions: {
+                resolveQuiz: number;
+                watchVideo: boolean;
+            };
+
+            files: any[];
+            not_opened: any[];
+
+            tutorial_quiz_contents_components: {
+                type: string;
+                content: string;
+                componentKey: string;
+            }[];
+
+            repl_lang: string[];
+            view_count: number;
+            is_preview: boolean;
+            collaboration: string;
+
+            contentsCategory: string | null;
+            contentsType: string;
+
+            useAISA: boolean;
+
+            contents_components: {
+                type: string;
+                content: string;
+                playerOptions: {
+                    captions: any[];
+                };
+                index_arr: any[];
+                inflearnUnitList: any[];
+                _id: string;
+                componentKey: string;
+            }[];
+
+            llmQuizList: any[];
+
+            index: string;
+            lecture_index: string;
+            lecture_subject: string;
+            subject: string;
+            instructor: string;
+
+            create_time: string;
+            is_open: boolean;
+            type: string;
+            updated: string;
+
+            tutorial_quiz_index: string;
+            quiz_form: string;
+
+            origin_lesson_index: string;
+            is_sample: boolean;
+            connected_lesson: string;
+
+            url_slug: string;
+            sequence: number;
+
+            state: number;
+
+            completedConditions: {
+                resolveQuiz: number;
+            };
+
+            quiz: {
+                answer_language: string[];
+
+                contentsType: string;
+                contents: string;
+
+                useRunScreenExample: boolean;
+                runScreenExample: string;
+
+                inputExample: string[];
+                outputExample: string[];
+
+                isCollaborationQuizForm: boolean;
+
+                options: Record<string, unknown>;
+
+                markOptions: {
+                    mark_trim: boolean;
+                    mark_line_trim: boolean;
+                    mark_all_trim: boolean;
+                    mark_delete_comma: boolean;
+                    mark_delete_period: boolean;
+                    mark_ignore_capital: boolean;
+                };
+            };
+        };
+
+        userAgent: string;
+        isIE11: boolean;
+        isHelpChannel: boolean;
+
+        embed: unknown;
+
+        ideHost: string;
+        entryHostPath: string;
+        microbitHostPath: string;
+        codingpartyEntryHostPath: string;
+        serviceNotice: unknown;
+
+        accountHost: string;
+
+        thirdPartySettings: {
+            swcamp: { active: boolean };
+            exp: { active: boolean };
+            aiGoormee: {
+                active: boolean;
+                lectureSettingActive: boolean;
+            };
+            mOTP: Record<string, unknown>;
+        };
+
+        isStudent: boolean;
+        isTeacher: boolean;
+
+        lecture: {
+            index: string;
+            type: number;
+            subject: string;
+            description: string;
+            contents: string;
+            coverImage: string;
+            id: string;
+            student_count: number;
+            origin_channel_index: string;
+
+            category: {
+                first: {
+                    id: string;
+                    label: {
+                        default: string;
+                        ko: string;
+                        en: string;
+                        ja: string;
+                    };
+                };
+                second: {
+                    id: string;
+                    label: {
+                        default: string;
+                        ko: string;
+                        en: string;
+                        ja: string;
+                    };
+                };
+                _id: string;
+            };
+
+            lessons: string[];
+
+            week: unknown;
+            estimatedTime: number;
+            use_certificate: boolean;
+
+            curriculum: any[]; // 👉 이거 너무 커서 any 추천
+        };
     };
 }
 
