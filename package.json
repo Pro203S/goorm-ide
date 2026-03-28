@@ -14,20 +14,28 @@
     ],
     "main": "./out/extension.js",
     "contributes": {
-        "authentication": [{
-            "id": "goormIde",
-            "label": "구름EDU"
-        }],
+        "authentication": [
+            {
+                "id": "goormIde",
+                "label": "구름EDU"
+            }
+        ],
         "commands": [
             {
                 "command": "goorm-ide.firstRun",
                 "title": "구름EDU 첫 세팅",
-                "category": "기본"
+                "category": "구름EDU"
             },
             {
-                "command": "goorm-ide.Login",
+                "command": "goorm-ide.login",
                 "title": "구름EDU로 로그인",
-                "category": "계정"
+                "category": "구름EDU"
+            },
+            {
+                "command": "goorm-ide.selectLearn",
+                "title": "강좌 선택",
+                "icon": "$(list-selection)",
+                "category": "구름EDU"
             }
         ],
         "menus": {
@@ -35,6 +43,13 @@
                 {
                     "command": "goorm-ide.firstRun",
                     "when": "false"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "goorm-ide.selectLearn",
+                    "when": "view == goormIdeView",
+                    "group": "navigation"
                 }
             ]
         },

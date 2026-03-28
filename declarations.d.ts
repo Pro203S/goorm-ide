@@ -1,4 +1,77 @@
 declare global {
+    type CurriculumData = RootNode[];
+
+    type RootNode = {
+        text: string;
+        id: string;
+        children: ChapterNode[];
+    };
+
+    type ChapterNode = {
+        text: string;
+        id: string;
+        type: "chapter";
+        children: (ChapterNode | TutorialNode)[];
+    };
+
+    type TutorialNode = {
+        text: string;
+        id: string;
+        type: "tutorial";
+
+        sequence: number;
+        url_slug: string;
+        quiz_form: string;
+        is_preview: boolean;
+
+        // 실제 데이터에서 일부만 존재 → 여기만 optional 유지
+        time_set?: boolean;
+        open_date?: string | null;
+        close_date?: string | null;
+    };
+    
+    type APILearn = {
+        index: string;
+        type: number;
+        subject: string;
+        description: string;
+        contents: string;
+        coverImage: string;
+        id: string;
+        student_count: number;
+        origin_channel_index: string;
+
+        category: {
+            first: {
+                id: string;
+                label: {
+                    default: string;
+                    ko: string;
+                    en: string;
+                    ja: string;
+                };
+            };
+            second: {
+                id: string;
+                label: {
+                    default: string;
+                    ko: string;
+                    en: string;
+                    ja: string;
+                };
+            };
+            _id: string;
+        };
+
+        lessons: string[];
+
+        week: null;
+        estimatedTime: number;
+        use_certificate: boolean;
+
+        curriculum: string; // ⚠️ JSON string (파싱 필요)
+    };
+
     type InitialState = {
         isIE: boolean;
         locale: string;

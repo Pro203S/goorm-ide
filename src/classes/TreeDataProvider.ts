@@ -6,7 +6,7 @@ export default class TreeDataProvider implements vscode.TreeDataProvider<TreeVie
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private _items: TreeViewItem[] = [];
-    private children: TreeViewItem[] = [];
+    private _children: Record<string, TreeViewItem[]> = {};
 
     getTreeItem(element: TreeViewItem): vscode.TreeItem {
         return element;
@@ -16,11 +16,27 @@ export default class TreeDataProvider implements vscode.TreeDataProvider<TreeVie
         if (!element) {
             return Promise.resolve(this._items);
         }
-        return Promise.resolve(this.children ?? []);
+        return Promise.resolve(this._children[element.id] ?? []);
     }
 
     addItem(item: TreeViewItem) {
         this._items.push(item);
+        this.refresh();
+    }
+
+    addChildren(id: string, item: TreeViewItem) {
+        if (!this._children[id])
+            this._children[id] = [];
+
+        this._children[id].push(item);
+        this.refresh();
+    }
+
+    removeChildren(id: string, itemId: string) {
+        if (!this._children[id])
+            this._children[id] = [];
+
+        this._children[id] = this._children[id].filter(v => v.id !== itemId);
         this.refresh();
     }
 
