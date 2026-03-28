@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
+import TreeDataProvider from './classes/TreeDataProvider';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log("goorm-ide");
+    vscode.window.registerTreeDataProvider('goormIdeView', new TreeDataProvider());
 }
