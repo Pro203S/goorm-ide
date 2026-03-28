@@ -44,7 +44,8 @@ export default class AuthenticationProvider implements vscode.AuthenticationProv
             "goorm.lang": "kor"
         };
 
-        const userData = await getUserData(this.goormUrl, cookies);
+        const initialState = await getUserData(this.goormUrl, cookies);
+        const userData = initialState.userData;
 
         const session = {
             "accessToken": JSON.stringify(cookies),

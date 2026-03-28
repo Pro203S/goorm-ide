@@ -1,7 +1,12 @@
 import axios from "axios";
 import { stringifyCookie } from "cookie";
 
-export default async function getUserData(goormUrl: string, cookies: Record<string, string>): Promise<InitialState["userData"]> {
+export default async function getInitialState(goormUrl: string, cookies: {
+    "accounts.sid": string,
+    "goorm.sid": string,
+    "goormaccounts.sid": string,
+    "goorm.lang": string
+}): Promise<InitialState> {
     const r = await axios.get<string>(goormUrl, {
         "headers": {
             "cookie": stringifyCookie(cookies)
@@ -15,5 +20,5 @@ export default async function getUserData(goormUrl: string, cookies: Record<stri
     const parsed = data[InitialStateIndex].trim().substring(toFind.length);
     const content = new Function(`return ${parsed}`)();
 
-    return content.userData;
+    return content;
 }
