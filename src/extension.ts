@@ -95,7 +95,8 @@ export async function activate(context: vscode.ExtensionContext) {
                     throw new Error("구름 URL이 설정되지 않았어요.");
 
                 const sessions = await authProvider.getSessions();
-                await authProvider.removeSession(sessions[0].id);
+                if (sessions[0])
+                    await authProvider.removeSession(sessions[0].id);
 
                 const session = await authProvider.createSession();
 
@@ -103,6 +104,28 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 await restoreSession();
                 vscode.window.showInformationMessage("구름EDU에 로그인되었습니다.");
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+            }
+        }),
+        vscode.commands.registerCommand("goorm-ide.logout", async () => {
+            try {
+                if (!await context.secrets.get("goormUrl"))
+                    throw new Error("구름 URL이 설정되지 않았어요.");
+
+                const sessions = await authProvider.getSessions();
+                if (sessions[0])
+                    await authProvider.removeSession(sessions[0].id);
+
+                await context.secrets.delete("session");
+
+                for await (const item of await treeProvider.getChildren()) {
+                    treeProvider.removeItem(item.id);
+                }
+                webviewProvider.setHTML("");
+
+                vscode.window.showInformationMessage("구름EDU에서 로그아웃되었습니다.");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
