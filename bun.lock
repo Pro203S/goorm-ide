@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "goorm-ide",
+      "dependencies": {
+        "shadowly": "^1.0.6",
+      },
       "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "22.x",
@@ -358,6 +361,8 @@
     "serialize-javascript": ["serialize-javascript@6.0.2", "", { "dependencies": { "randombytes": "^2.1.0" } }, "sha512-Saa1xPByTTq2gdeFZYLLo+RFE35NHZkAbqZeWNd3BpzppeVisAqpDjcp8dyf6uIvEqJRd46jemmyA4iFIeVk8g=="],
 
     "setimmediate": ["setimmediate@1.0.5", "", {}, "sha512-MATJdZp8sLqDl/68LfQmbP8zKPLQNV6BIZoIgrscFDQ+RsvK/BxeDQOgyxKKoh0y/8h3BqVFnCqQ/gd+reiIXA=="],
+
+    "shadowly": ["shadowly@1.0.6", "", { "peerDependencies": { "typescript": "^5" } }, "sha512-1O1UvX4fStRsfrN//u3nEI/H2gN7kcqJhHX5X5dGYfnuCfQs8ADZv0Xur3kd5kozcTA2aXMlI2mv9IjCNooGRA=="],
 
     "shebang-command": ["shebang-command@2.0.0", "", { "dependencies": { "shebang-regex": "^3.0.0" } }, "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA=="],
 
