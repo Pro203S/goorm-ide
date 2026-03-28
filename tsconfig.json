@@ -10,7 +10,8 @@
 		"rootDir": "src",
 		"strict": true,
 		"types": [
-			"./declarations.d.ts"
+			"./declarations.d.ts",
+			"node"
 		]
 	}
 }
