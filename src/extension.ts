@@ -13,6 +13,7 @@ import sanitizeFileName from './modules/sanitizeFileName';
 import getHTML from './modules/getHTML';
 import SocketIO from './modules/SocketIO';
 import DebugSocket from './modules/DebugSocket';
+import DebugTerminal from './classes/DebugTerminal';
 
 let loggedIn: boolean = false;
 let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
@@ -589,11 +590,41 @@ export async function activate(context: vscode.ExtensionContext) {
                     debugSocket.close();
                 }
 
-                debugSocket = new DebugSocket(`${containerSocket.options.secure ? "wss" : "ws"}://${containerSocket.url}${containerSocket.options.path}`, quizSocket.sid, {
-                    "cookies": JSON.parse(session.accessToken)
+                const date36radix = () => new Date().getTime().toString(36);
+                const socketUrl = `${containerSocket.options.secure ? "https" : "http"}://${containerSocket.url}${containerSocket.options.path}/`;
+                const pollingSid = await axios.get<string>(socketUrl, {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                    },
+                    "params": {
+                        "EIO": 4,
+                        "transport": "polling",
+                        "t": date36radix()
+                    }
                 });
 
+                const pollingSidData = JSON.parse(pollingSid.data.slice(1));
+                const sid = pollingSidData.sid;
+                console.log("polling sid:", sid);
+
+                debugSocket = new DebugSocket(
+                    socketUrl,
+                    sid,
+                    containerComplete.token,
+                    {
+                        "cookies": JSON.parse(session.accessToken)
+                    }
+                );
+
                 await debugSocket.connect();
+
+                const terminalProvider = new DebugTerminal(debugSocket);
+                const terminal = vscode.window.createTerminal({
+                    name: "Goorm Terminal",
+                    pty: terminalProvider
+                });
+
+                terminal.show();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
