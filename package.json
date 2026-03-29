@@ -38,7 +38,7 @@
             },
             {
                 "command": "goorm-ide.selectLearn",
-                "title": "강좌 선택",
+                "title": "수업 선택",
                 "icon": "$(three-bars)",
                 "category": "구름EDU"
             },
@@ -56,6 +56,12 @@
                 "command": "goorm-ide.submitQuiz",
                 "title": "제출",
                 "category": "구름EDU"
+            },
+            {
+                "command": "goorm-ide.attendance",
+                "title": "출석하기",
+                "category": "구름EDU",
+                "icon": "$(chevron-right)"
             }
         ],
         "menus": {
@@ -66,6 +72,11 @@
                 }
             ],
             "view/title": [
+                {
+                    "command": "goorm-ide.attendance",
+                    "when": "view == goormTree",
+                    "group": "navigation"
+                },
                 {
                     "command": "goorm-ide.selectLearn",
                     "when": "view == goormTree",

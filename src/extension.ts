@@ -9,9 +9,11 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { WebviewProvider } from './classes/WebviewProvider';
+import sanitizeFileName from './modules/sanitizeFileName';
 
 let loggedIn: boolean = false;
 let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
+let selectedLectureIndex: string | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     if (!fs.existsSync(goormTemp))
@@ -41,12 +43,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
             const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
-            await getInitialState(goormUrl, JSON.parse(session.accessToken));
+            const r = await getInitialState(goormUrl, JSON.parse(session.accessToken));
 
             loggedIn = true;
             treeProvider.addItem(new TreeViewItem({
                 "id": "sessionState",
-                "label": session.account.label + "(으)로 로그인",
+                "label": "현재 계정: " + r.userData.name,
                 "collapsibleState": vscode.TreeItemCollapsibleState.None,
                 "icon": new vscode.ThemeIcon("account"),
                 "contextValue": "sessionState"
@@ -131,6 +133,40 @@ export async function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
             }
         }),
+        vscode.commands.registerCommand("goorm-ide.attendance", async () => {
+            try {
+                if (!loggedIn)
+                    throw new Error("로그인해주세요!");
+
+                const rawSession = await context.secrets.get("session");
+                const goormUrl = await context.secrets.get("goormUrl");
+
+                if (!rawSession || !goormUrl) {
+                    for await (const item of await treeProvider.getChildren()) {
+                        treeProvider.removeItem(item.id);
+                    }
+                    throw new Error("재로그인해주세요!");
+                }
+
+                if (!selectedLectureIndex) throw new Error("수업을 선택해주세요!");
+
+                const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+
+                const r = await axios.post(`${goormUrl}/api/lecture/${selectedLectureIndex}/always-attendance/attendance`, {
+                    "data": "{}",
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken)),
+                        "Content-Type": "application/json"
+                    },
+                    "withCredentials": true,
+                    "validateStatus": () => true
+                });
+                console.log(r.status, r.data);
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+            }
+        }),
         vscode.commands.registerCommand("goorm-ide.selectLearn", async () => {
             try {
                 if (!loggedIn)
@@ -159,7 +195,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     })),
                     {
                         "canPickMany": false,
-                        "placeHolder": "강좌 선택",
+                        "placeHolder": "수업 선택",
                         "title": "구름EDU"
                     }
                 );
@@ -181,6 +217,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
 
                 const curriculumData = r.data.curriculumData;
+                selectedLectureIndex = r.data.index;
 
                 treeProvider.addItem(new TreeViewItem({
                     "id": "current-learn",
@@ -267,7 +304,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     true
                 );
 
-                const filePath = path.join(goormTemp, name + ".c");
+                const filePath = path.join(goormTemp, sanitizeFileName(name) + ".c");
                 const uri = vscode.Uri.parse(filePath + "?goorm");
                 fs.writeFileSync(filePath, content, "utf-8");
 
@@ -321,12 +358,12 @@ export async function activate(context: vscode.ExtensionContext) {
                         <div class="sep"></div>
                         <div class="desc">
                             <span class="title">입력 예시</span>
-                            ${quiz.inputExample.map(v => `<span class="content">${v}</span>`)}
+                            ${quiz.inputExample.map(v => `<span class="content">${v.replaceAll("\n", "<br>")}</span>`)}
                         </div>
                         <div class="sep"></div>
                         <div class="desc">
                             <span class="title">출력 예시</span>
-                            ${quiz.outputExample.map(v => `<span class="content">${v}</span>`)}
+                            ${quiz.outputExample.map(v => `<span class="content">${v.replaceAll("\n", "<br>")}</span>`)}
                         </div>
                         <div class="sep"></div>
                     </body>
@@ -342,7 +379,8 @@ export async function activate(context: vscode.ExtensionContext) {
                     false
                 );
             }
-        })
+        }),
+
     ];
 
     context.subscriptions.push(
@@ -366,7 +404,38 @@ export async function activate(context: vscode.ExtensionContext) {
         }),
         vscode.workspace.onWillSaveTextDocument((e) => {
             e.waitUntil(new Promise(async (resolve) => {
-
+                const data = {
+                    "lectureIndex": "",
+                    "examIndex": "les_XMapk_1773133335150",
+                    "quizIndex": "q_WfFlf_1773133328935",
+                    "form": "programming",
+                    "project": {
+                        "projectKey": "programming.c",
+                        "language": "c",
+                        "langVersion": "17",
+                        "projectCode": "programming.c",
+                        "label": "C",
+                        "mainFiletype": "c",
+                        "files": [
+                            {
+                                "filepath": "",
+                                "filename": "Main.c",
+                                "label": "C",
+                                "isDir": false,
+                                "isMain": true,
+                                "content": [
+                                    {
+                                        "hidden": false,
+                                        "readonly": false,
+                                        "source": "#include <stdio.h>\n\nint main() {\n\tchar str[20];\n\tscanf(\"%s\", str);\n\tprintf(\"입력한 문자열: %s\", str);\n\n\treturn 0;\n}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "userId": "117367227022516387857_o6263_google",
+                    "removedBookmarks": []
+                };
             }));
         }),
     );
