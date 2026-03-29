@@ -12,6 +12,7 @@ import { WebviewProvider } from './classes/WebviewProvider';
 import sanitizeFileName from './modules/sanitizeFileName';
 import getHTML from './modules/getHTML';
 import SocketIO from './modules/SocketIO';
+import DebugSocket from './modules/DebugSocket';
 
 let loggedIn: boolean = false;
 let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
@@ -19,7 +20,7 @@ let selectedLectureIndex: string | undefined = undefined;
 let currentQuizUrl: string | undefined = undefined;
 let currentProject: APIWorkspaceLesson["result"]["project"][string] | undefined = undefined;
 let quizSocket: SocketIO | undefined = undefined;
-let debugSocket: SocketIO | undefined = undefined;
+let debugSocket: DebugSocket | undefined = undefined;
 let changeSelectionEvent: vscode.Disposable | undefined = undefined;
 let changeSelection: TreeViewItem | undefined = undefined;
 
@@ -288,7 +289,7 @@ export async function activate(context: vscode.ExtensionContext) {
                                 "arguments": [
                                     curriculum.index,
                                     lesson.index,
-                                    curriculum.name,
+                                    curriculum.name + " " + lesson.name,
                                     sequence,
                                     lesson.name
                                 ]
@@ -548,7 +549,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     throw new Error("재로그인해주세요!");
                 }
 
-                if (!selectedLectureIndex) throw new Error("수업을 선택해주세요!");
+                if (!selectedLectureIndex || !quizSocket || !quizSocket.sid) throw new Error("수업을 선택해주세요!");
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
@@ -557,12 +558,18 @@ export async function activate(context: vscode.ExtensionContext) {
                         "cookie": stringifyCookie(JSON.parse(session.accessToken))
                     }
                 });
+                const data = available.data;
 
                 if (debugSocket) {
                     debugSocket.close();
                 }
 
-                // TODO: 디버그 소켓
+                console.log("DEBUG SOCKET", `wss://${data.proxyHost}/app/${data.host}/${data.port}`);
+                debugSocket = new DebugSocket(`https://${data.proxyHost}/app/${data.host}/${data.port}`, quizSocket.sid, {
+                    "cookies": JSON.parse(session.accessToken)
+                });
+
+                await debugSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

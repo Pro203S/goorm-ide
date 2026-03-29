@@ -2,14 +2,14 @@ import WebSocket, { RawData } from "ws";
 
 type Listener = (data: any) => void;
 
-export default class SocketIO {
+export default class DebugSocket {
     private ws!: WebSocket;
-    public sid?: string;
 
     private listeners = new Map<string, Listener[]>();
 
     constructor(
         private baseUrl: string,
+        private sid: string,
         private opts?: {
             cookies?: Record<string, string>;
         }
@@ -26,7 +26,7 @@ export default class SocketIO {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
         this.ws = new WebSocket(
-            `${wsUrl}/socket.io/?EIO=4&transport=websocket`,
+            `${wsUrl}/socket.io/?EIO=4&transport=websocket&sid=${this.sid}`,
             {
                 headers: {
                     Cookie: this.buildCookie()
@@ -36,36 +36,27 @@ export default class SocketIO {
 
         this.ws.on("close", (code, reason) => {
             if (code - 1000 < 1000) return;
-            
-            console.log("Goorm socket closed", code, Buffer.from(reason).toString("utf-8"));
+
+            console.log("Debug socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
 
-        let received40 = false;
+        this.ws.on("open", () => {
+            try {
+                console.log("debug socket open");
+                this.ws.send("2probe");
+            } catch (err) {
+                const e = err as Error;
+                this.emitLocal("error", e);
+                this.close();
+            }
+        });
 
         // 4️⃣ 메시지 처리
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
                 console.log("D", str);
-
-                // ping
-                if (str === "2") {
-                    this.ws.send("3");
-                    return;
-                }
-
-                // 연결 처리
-                if (str.startsWith("0")) {
-                    this.ws.send("40");
-                    return;
-                }
-
-                // event
-                if (str.startsWith("42")) {
-                    const [event, data] = JSON.parse(str.slice(2));
-                    this.emitLocal(event, data);
-                }
             } catch (err) {
                 const e = err as Error;
                 this.emitLocal("error", e);
@@ -78,13 +69,7 @@ export default class SocketIO {
                 try {
                     const str = msg.toString();
 
-                    if (str.startsWith("40") && !received40) {
-                        received40 = true;
-                        const obj = JSON.parse(str.slice(2));
-                        this.sid = obj.sid;
-                        resolve();
-                        return;
-                    }
+                    resolve();
                 } catch (err) {
                     const e = err as Error;
                     this.emitLocal("error", e);
