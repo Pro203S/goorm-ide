@@ -35,6 +35,8 @@ export default class SocketIO {
         );
 
         this.ws.on("close", (code, reason) => {
+            if (code - 1000 < 1000) return;
+            
             console.log("Goorm socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });

@@ -223,7 +223,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         list.map(v => ({
                             "label": v.subject,
                             "value": v.sequence,
-                            "description": v.classification.join(", ")
+                            "description": v.description
                         })),
                         {
                             "canPickMany": false,
@@ -416,6 +416,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (changeSelectionEvent)
                     changeSelectionEvent.dispose();
 
+                const rawSession = await context.secrets.get("session");
+                const goormUrl = await context.secrets.get("goormUrl");
+
+                if (!rawSession || !goormUrl) {
+                    for await (const item of await treeProvider.getChildren()) {
+                        treeProvider.removeItem(item.id);
+                    }
+                    return Promise.reject(new Error("재로그인해주세요!"));
+                }
+
                 const r = await vscode.window.withProgress<SubmitQuizResponse>({
                     "location": vscode.ProgressLocation.Notification,
                     "title": "제출하고 있습니다...",
@@ -423,16 +433,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 }, async () => {
                     if (!loggedIn)
                         return Promise.reject(new Error("로그인해주세요!"));
-
-                    const rawSession = await context.secrets.get("session");
-                    const goormUrl = await context.secrets.get("goormUrl");
-
-                    if (!rawSession || !goormUrl) {
-                        for await (const item of await treeProvider.getChildren()) {
-                            treeProvider.removeItem(item.id);
-                        }
-                        return Promise.reject(new Error("재로그인해주세요!"));
-                    }
 
                     if (!selectedLectureIndex) return Promise.reject(new Error("수업을 선택해주세요!"));
 
@@ -471,11 +471,47 @@ export async function activate(context: vscode.ExtensionContext) {
                     return Promise.resolve(data);
                 });
 
-                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("알 수 없는 오류가 발생했어요.");
+                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("알 수 없는 오류가 발생했어요. 1");
 
-                const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(cookieString));
+                if (!changeSelection.command) throw new Error("알 수 없는 오류가 발생했어요. 2");
+                if (!changeSelection.command.arguments) throw new Error("알 수 없는 오류가 발생했어요. 3");
 
-                console.log(changeSelection, state.lecture.curriculumData.find(v => v.index === changeSelection?.id));
+                const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
+                const learn = await axios.get<APILearn>("https://sunrint-hs.goorm.io/api/learn", {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(cookieString))
+                    },
+                    "withCredentials": true,
+                    "params": {
+                        "sequence": seq
+                    }
+                });
+                const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
+                if (!curriculum) throw new Error("알 수 없는 오류가 발생했어요. 4");
+                const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
+                if (!lesson) throw new Error("알 수 없는 오류가 발생했어요. 5");
+
+                const treeItems = await treeProvider.getChildren();
+                const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
+                if (currIndexNumber === -1) throw new Error("알 수 없는 오류가 발생했어요. 6");
+                const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
+                if (lessonIndexNumber === -1) throw new Error("알 수 없는 오류가 발생했어요. 7");
+
+                treeProvider.changeItem(currIndexNumber, new TreeViewItem({
+                    ...treeItems[currIndexNumber],
+                    "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
+                }));
+                treeProvider.changeChildren(treeItems[currIndexNumber].id, lessonIndexNumber, new TreeViewItem({
+                    ...(await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index)))[lessonIndexNumber],
+                    "icon": (() => {
+                        if (lesson.score === 100) return new vscode.ThemeIcon("check");
+
+                        switch (lesson.type) {
+                            case 'contents': return new vscode.ThemeIcon("three-bars");
+                            default: return new vscode.ThemeIcon("file-code");
+                        }
+                    })()
+                }));
 
                 if (r.solved) {
                     vscode.window.showInformationMessage("정답입니다.");
@@ -485,6 +521,7 @@ export async function activate(context: vscode.ExtensionContext) {
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
+                console.error(e);
                 vscode.commands.executeCommand(
                     "setContext",
                     "goorm-ide.isEditingSource",
