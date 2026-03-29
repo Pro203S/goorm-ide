@@ -24,6 +24,8 @@ let quizSocket: SocketIO | undefined = undefined;
 let debugSocket: DebugSocket | undefined = undefined;
 let changeSelectionEvent: vscode.Disposable | undefined = undefined;
 let changeSelection: TreeViewItem | undefined = undefined;
+let currentTerminal: vscode.Terminal | undefined = undefined;
+let currentTerminalProvider: DebugTerminal | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     if (!fs.existsSync(goormTemp))
@@ -616,15 +618,19 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 );
 
-                await debugSocket.connect();
-
-                const terminalProvider = new DebugTerminal(debugSocket);
-                const terminal = vscode.window.createTerminal({
-                    name: "Goorm Terminal",
-                    pty: terminalProvider
+                currentTerminalProvider = new DebugTerminal(debugSocket);
+                currentTerminal = vscode.window.createTerminal({
+                    "name": "Goorm Terminal",
+                    "pty": currentTerminalProvider
                 });
 
-                terminal.show();
+                currentTerminal.show();
+
+                debugSocket.on("pty_execute_command", (data) => {
+                    
+                });
+
+                await debugSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
