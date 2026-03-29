@@ -69,6 +69,10 @@
                 {
                     "command": "goorm-ide.firstRun",
                     "when": "false"
+                },
+                {
+                    "command": "goorm-ide.showQuiz",
+                    "when": "false"
                 }
             ],
             "view/title": [

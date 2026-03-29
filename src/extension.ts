@@ -19,7 +19,6 @@ let selectedLectureIndex: string | undefined = undefined;
 let currentQuizUrl: string | undefined = undefined;
 let currentProject: APIWorkspaceLesson["result"]["project"][string] | undefined = undefined;
 let quizSocket: SocketIO | undefined = undefined;
-let submitSocket: SocketIO | undefined = undefined;
 let debugSocket: SocketIO | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -27,9 +26,10 @@ export async function activate(context: vscode.ExtensionContext) {
         fs.mkdirSync(goormTemp);
 
     const treeProvider = new TreeDataProvider();
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('goormTree', treeProvider)
-    );
+    const treeView = vscode.window.createTreeView("goormTree", {
+        treeDataProvider: treeProvider
+    });
+    context.subscriptions.push(treeView);
 
     const authProvider = new AuthenticationProvider("https://sunrint-hs.goorm.io");
     context.subscriptions.push(
@@ -190,7 +190,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
             }
         }),
-        vscode.commands.registerCommand("goorm-ide.selectLearn", async () => {
+        vscode.commands.registerCommand("goorm-ide.selectLearn", async (seq?: number) => {
             try {
                 if (!loggedIn)
                     throw new Error("로그인해주세요!");
@@ -210,19 +210,25 @@ export async function activate(context: vscode.ExtensionContext) {
                 const initialState = await getInitialState(goormUrl, JSON.parse(session.accessToken));
                 const list = initialState.channelLectureList.allLectures;
 
-                const lectureId = await vscode.window.showQuickPick(
-                    list.map(v => ({
-                        "label": v.subject,
-                        "value": v.sequence,
-                        "description": v.classification.join(", ")
-                    })),
-                    {
-                        "canPickMany": false,
-                        "placeHolder": "수업 선택",
-                        "title": "구름EDU"
-                    }
-                );
-                if (!lectureId) return;
+                let sequence = seq;
+
+                if (!sequence) {
+                    const lectureId = await vscode.window.showQuickPick(
+                        list.map(v => ({
+                            "label": v.subject,
+                            "value": v.sequence,
+                            "description": v.classification.join(", ")
+                        })),
+                        {
+                            "canPickMany": false,
+                            "placeHolder": "수업 선택",
+                            "title": "구름EDU"
+                        }
+                    );
+                    if (!lectureId) return;
+
+                    sequence = lectureId.value;
+                }
 
                 const r = await axios.get<APILearn>("https://sunrint-hs.goorm.io/api/learn", {
                     "headers": {
@@ -230,7 +236,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     },
                     "withCredentials": true,
                     "params": {
-                        "sequence": lectureId.value
+                        sequence
                     }
                 });
 
@@ -277,7 +283,7 @@ export async function activate(context: vscode.ExtensionContext) {
                                     curriculum.index,
                                     lesson.index,
                                     curriculum.name + " " + lesson.name,
-                                    lectureId.value,
+                                    sequence,
                                     lesson.name
                                 ]
                             }
@@ -366,25 +372,23 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage("구름EDU: " + error.message);
                 });
 
-                quizSocket.on("connect", () => {
-                    quizSocket?.send("enterance_to_lesson", {
-                        "user_id": session.id,
-                        "lesson_index": state.lesson.index,
-                        "room_id": session.id,
-                        "room_type": "user",
-                        "lecture_index": state.lecture.index,
-                        "channel_index": state.channel.index
-                    });
-                    quizSocket?.send("enterance_to_quiz", {
-                        "lectureIndex": state.lecture.index,
-                        "examIndex": state.lesson.index,
-                        "quizIndex": state.lesson.tutorial_quiz_index,
-                        "userId": session.id,
-                        "isLesson": true
-                    });
-                });
+                await quizSocket.connect();
 
-                quizSocket.connect();
+                quizSocket?.send("enterance_to_lesson", {
+                    "user_id": session.id,
+                    "lesson_index": state.lesson.index,
+                    "room_id": session.id,
+                    "room_type": "user",
+                    "lecture_index": state.lecture.index,
+                    "channel_index": state.channel.index
+                });
+                quizSocket?.send("enterance_to_quiz", {
+                    "lectureIndex": state.lecture.index,
+                    "examIndex": state.lesson.index,
+                    "quizIndex": state.lesson.tutorial_quiz_index,
+                    "userId": session.id,
+                    "isLesson": true
+                });
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
@@ -395,6 +399,104 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
             }
         }),
+        vscode.commands.registerCommand("goorm-ide.submitQuiz", async () => {
+            try {
+                let cookieString: string | undefined = undefined;
+                const r = await vscode.window.withProgress<SubmitQuizResponse>({
+                    "location": vscode.ProgressLocation.Notification,
+                    "title": "제출하고 있습니다...",
+                    "cancellable": false
+                }, async () => {
+                    if (!loggedIn)
+                        return Promise.reject(new Error("로그인해주세요!"));
+
+                    const rawSession = await context.secrets.get("session");
+                    const goormUrl = await context.secrets.get("goormUrl");
+
+                    if (!rawSession || !goormUrl) {
+                        for await (const item of await treeProvider.getChildren()) {
+                            treeProvider.removeItem(item.id);
+                        }
+                        return Promise.reject(new Error("재로그인해주세요!"));
+                    }
+
+                    if (!selectedLectureIndex) return Promise.reject(new Error("수업을 선택해주세요!"));
+
+                    const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+                    const document = vscode.window.activeTextEditor?.document;
+                    if (!quizSocket || !document || !currentQuizUrl || !currentProject) return Promise.reject(new Error("과제를 선택해주세요!"));
+
+                    const closeListener = ({ code, reason }: { code: number, reason: Buffer }) => {
+                        console.log(code, reason);
+                        return Promise.reject(new Error(code + " " + Buffer.from(reason).toString("utf-8")));
+                    };
+                    quizSocket.once("close", closeListener);
+
+                    const r = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+                    cookieString = session.accessToken;
+
+                    const event = "/submit_quiz/" + r.lesson.quiz_form;
+                    quizSocket.send(event, {
+                        "id": new Date().getTime(),
+                        "filetype": currentProject.mainFiletype,
+                        "lang": currentProject.language,
+                        "lecture_index": selectedLectureIndex,
+                        "lesson_index": r.lesson.index,
+                        "quiz_index": r.lesson.tutorial_quiz_index,
+                        "user_id": r.userData.id,
+                        "userData": r.userData,
+                        "removed_bookmarks": [],
+                        "source": [
+                            document.getText()
+                        ],
+                        "useTextbook": false
+                    });
+
+                    const data = await quizSocket.waitUntil(event);
+                    quizSocket.off("close", closeListener);
+                    return Promise.resolve(data);
+                });
+
+                if (!currentQuizUrl || !cookieString) throw new Error("알 수 없는 오류가 발생했어요.");
+
+                const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(cookieString));
+
+                for await (const item of await treeProvider.getChildren()) {
+                    if (item.id === "sessionState") continue;
+
+                    treeProvider.removeItem(item.id);
+                    treeProvider.refresh();
+                }
+
+                await vscode.commands.executeCommand("goorm-ide.selectLearn", state.lecture.sequence);
+
+                for await (const lecture of await treeProvider.getChildren()) {
+                    for await (const item of await treeProvider.getChildren(lecture)) {
+                        if (item.id !== state.lesson.index) continue;
+
+                        await treeView.reveal(item, {
+                            "select": true,
+                            "expand": true,
+                            "focus": true
+                        });
+                    }
+                }
+
+                if (r.solved) {
+                    vscode.window.showInformationMessage("정답입니다.");
+                } else {
+                    vscode.window.showErrorMessage("오답입니다.");
+                }
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+                vscode.commands.executeCommand(
+                    "setContext",
+                    "goorm-ide.isEditingSource",
+                    false
+                );
+            }
+        })
     );
 
     // 이벤트 푸시
@@ -405,6 +507,10 @@ export async function activate(context: vscode.ExtensionContext) {
             if (!uri.query.startsWith("goorm")) {
                 currentQuizUrl = undefined;
                 currentProject = undefined;
+
+                if (quizSocket)
+                    quizSocket.close();
+
                 vscode.commands.executeCommand(
                     "setContext",
                     "goorm-ide.isEditingSource",

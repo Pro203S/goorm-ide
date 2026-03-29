@@ -503,6 +503,7 @@ declare global {
         isTeacher: boolean;
 
         lecture: {
+            sequence: number;
             index: string;
             type: number;
             subject: string;
@@ -587,6 +588,17 @@ declare global {
             curriculumData: APILearn["curriculumData"];
         };
     }
+
+    type SubmitQuizResponse = {
+        "saved": boolean,
+        "result": boolean,
+        "solved": boolean,
+        "all_pass": boolean,
+        "isStateUpdated": boolean,
+        "quizState": boolean,
+        "score"?: number,
+        "total_score"?: number
+    };
 }
 
 export { };

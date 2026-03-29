@@ -5,19 +5,19 @@ export default class TreeViewItem extends vscode.TreeItem {
 
     constructor(config: {
         "id": string,
-        "label": string,
-        "description"?: string,
+        "label"?: string | vscode.TreeItemLabel,
+        "description"?: string | boolean,
         "onClick"?: vscode.Command,
-        "collapsibleState": vscode.TreeItemCollapsibleState,
-        "tooltip"?: string,
+        "collapsibleState"?: vscode.TreeItemCollapsibleState,
+        "tooltip"?: string | vscode.MarkdownString,
         "icon"?: string | vscode.IconPath,
         "contextValue"?: string
     }) {
-        super(config.label, config.collapsibleState);
+        super(config.label ?? "", config.collapsibleState);
 
         this.id = config.id;
 
-        this.tooltip = config.label;
+        this.tooltip = config.onClick?.title;
         this.description = config.description;
 
         this.iconPath = config.icon;

@@ -3,7 +3,7 @@ import WebSocket from "ws";
 type Listener = (data: any) => void;
 
 export default class SocketIO {
-    private ws?: WebSocket;
+    private ws!: WebSocket;
     private sid?: string;
 
     private listeners = new Map<string, Listener[]>();
@@ -22,7 +22,7 @@ export default class SocketIO {
             .join("; ");
     }
 
-    connect() {
+    async connect() {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
         this.ws = new WebSocket(
@@ -36,11 +36,11 @@ export default class SocketIO {
 
         // 3️⃣ 연결 처리
         this.ws.on("open", () => {
-            this.ws?.send("40"); // socket.io connect
+            this.ws.send("40"); // socket.io connect
         });
 
         this.ws.on("close", (code, reason) => {
-            console.log("closed", code, Buffer.from(reason).toString("utf-8"));
+            this.emitLocal("close", { code, reason });
         });
 
         let received40 = false;
@@ -53,21 +53,13 @@ export default class SocketIO {
 
                 // ping
                 if (str === "2") {
-                    this.ws?.send("3");
+                    this.ws.send("3");
                     return;
                 }
 
                 // 연결 처리
                 if (str.startsWith("0")) {
-                    this.ws?.send("40");
-                    return;
-                }
-
-                if (str.startsWith("40") && !received40) {
-                    received40 = true;
-                    const obj = JSON.parse(str.slice(2));
-                    this.sid = obj.sid;
-                    this.emitLocal("connect", this.sid);
+                    this.ws.send("40");
                     return;
                 }
 
@@ -81,6 +73,26 @@ export default class SocketIO {
                 this.emitLocal("error", e);
                 this.close();
             }
+        });
+
+        return new Promise<void>(resolve => {
+            this.ws.on("message", (msg) => {
+                try {
+                    const str = msg.toString();
+
+                    if (str.startsWith("40") && !received40) {
+                        received40 = true;
+                        const obj = JSON.parse(str.slice(2));
+                        this.sid = obj.sid;
+                        resolve();
+                        return;
+                    }
+                } catch (err) {
+                    const e = err as Error;
+                    this.emitLocal("error", e);
+                    this.close();
+                }
+            });
         });
     }
 
@@ -99,6 +111,44 @@ export default class SocketIO {
         this.listeners.get(event)!.push(listener);
     }
 
+    once(event: string, listener: Listener) {
+        const wrapper: Listener = (data) => {
+            this.off(event, wrapper); // 실행 후 제거
+            listener(data);
+        };
+
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+
+        this.listeners.get(event)!.push(wrapper);
+    }
+
+    off(event: string, listener: Listener) {
+        const list = this.listeners.get(event);
+        if (!list) return;
+
+        const idx = list.indexOf(listener);
+        if (idx !== -1) {
+            list.splice(idx, 1);
+        }
+    }
+
+    async waitUntil<T = any>(event: string): Promise<T> {
+        return new Promise((resolve) => {
+            this.ws.on("message", (msg) => {
+                const str = msg.toString();
+
+                if (str.startsWith("42")) {
+                    const [ev, data] = JSON.parse(str.slice(2));
+                    if (ev === event) {
+                        return resolve(data);
+                    }
+                }
+            });
+        });
+    }
+
     private emitLocal(event: string, data: any) {
         const list = this.listeners.get(event);
         if (!list) return;
@@ -109,7 +159,6 @@ export default class SocketIO {
     }
 
     close() {
-        this.ws?.close();
-        this.ws = undefined;
+        this.ws.close();
     }
 }

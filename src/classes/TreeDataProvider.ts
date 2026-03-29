@@ -45,6 +45,19 @@ export default class TreeDataProvider implements vscode.TreeDataProvider<TreeVie
         this.refresh();
     }
 
+    changeChildren(parentId: string, index: number, item: TreeViewItem) {
+        const parent = this._children[parentId];
+        if (!parent) throw new Error("Parent not found");
+
+        parent[index] = item;
+        this.refresh();
+    }
+
+    changeItem(index: number, item: TreeViewItem) {
+        this._items[index] = item;
+        this.refresh();
+    }
+
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);
     }
