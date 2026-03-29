@@ -549,27 +549,43 @@ export async function activate(context: vscode.ExtensionContext) {
                     throw new Error("재로그인해주세요!");
                 }
 
-                if (!selectedLectureIndex || !quizSocket || !quizSocket.sid) throw new Error("수업을 선택해주세요!");
+                const document = vscode.window.activeTextEditor;
+                if (
+                    !selectedLectureIndex ||
+                    !quizSocket ||
+                    !quizSocket.sid ||
+                    !currentQuizUrl ||
+                    !currentProject ||
+                    !document
+                ) throw new Error("수업을 선택해주세요!");
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+                const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+                console.log(state);
+                const file = currentProject.files[0];
 
-                const available = await axios.get<APIOtAvailable>("https://sunrint-hs.goorm.io/api/ot/available", {
-                    "headers": {
-                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
-                    }
+                quizSocket.send("build_in_container", {
+                    "filetype": currentProject.mainFiletype,
+                    "form": state.lesson.quiz_form,
+                    "href": currentQuizUrl,
+                    "input": "",
+                    "output": "",
+                    "lang": "c",
+                    "label": "C",
+                    "lecture_index": selectedLectureIndex,
+                    "lesson_index": state.lesson.index,
+                    "quiz_index": state.lesson.tutorial_quiz_index,
+                    "show_runtime": true,
+                    "source": [
+                        document.document.getText()
+                    ],
+                    "stat": false,
+                    "collaboration": true
                 });
-                const data = available.data;
 
                 if (debugSocket) {
                     debugSocket.close();
                 }
-
-                console.log("DEBUG SOCKET", `wss://${data.proxyHost}/app/${data.host}/${data.port}`);
-                debugSocket = new DebugSocket(`https://${data.proxyHost}/app/${data.host}/${data.port}`, quizSocket.sid, {
-                    "cookies": JSON.parse(session.accessToken)
-                });
-
-                await debugSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

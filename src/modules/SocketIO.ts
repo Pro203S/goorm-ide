@@ -94,7 +94,7 @@ export default class SocketIO {
         });
     }
 
-    async send(event: string, data: any) {
+    send(event: string, data: any) {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;

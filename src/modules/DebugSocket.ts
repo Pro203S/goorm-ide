@@ -25,6 +25,7 @@ export default class DebugSocket {
     async connect() {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
+        console.log("Debug socket connecting to ", `${wsUrl}/socket.io/?EIO=4&transport=websocket&sid=${this.sid}`);
         this.ws = new WebSocket(
             `${wsUrl}/socket.io/?EIO=4&transport=websocket&sid=${this.sid}`,
             {
@@ -33,6 +34,12 @@ export default class DebugSocket {
                 }
             }
         );
+
+        this.ws.on("error", (e) => {
+            console.error("DEBUG SOCKET", e);
+            this.emitLocal("error", e);
+            this.close();
+        });
 
         this.ws.on("close", (code, reason) => {
             if (code - 1000 < 1000) return;
