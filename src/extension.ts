@@ -10,10 +10,17 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { WebviewProvider } from './classes/WebviewProvider';
 import sanitizeFileName from './modules/sanitizeFileName';
+import getHTML from './modules/getHTML';
+import SocketIO from './modules/SocketIO';
 
 let loggedIn: boolean = false;
 let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
 let selectedLectureIndex: string | undefined = undefined;
+let currentQuizUrl: string | undefined = undefined;
+let currentProject: APIWorkspaceLesson["result"]["project"][string] | undefined = undefined;
+let quizSocket: SocketIO | undefined = undefined;
+let submitSocket: SocketIO | undefined = undefined;
+let debugSocket: SocketIO | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     if (!fs.existsSync(goormTemp))
@@ -59,7 +66,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
-    const commands = [
+    // 명령어 푸시
+    context.subscriptions.push(
         vscode.commands.registerCommand("goorm-ide.firstRun", async () => {
             try {
                 const url = await vscode.window.showInputBox({
@@ -298,6 +306,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
+                if (quizSocket) {
+                    quizSocket.close();
+                }
+
                 const r = await axios.get<APIWorkspaceLesson>("https://sunrint-hs.goorm.io/api/workspace/lesson", {
                     "withCredentials": true,
                     "headers": {
@@ -312,6 +324,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 const project = r.data.result.project[projects[0]];
                 const file = project.files[0];
                 const content = file.content[0].source;
+                currentProject = project;
 
                 vscode.commands.executeCommand(
                     "setContext",
@@ -333,58 +346,22 @@ export async function activate(context: vscode.ExtensionContext) {
                 const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
                 if (!lesson) throw new Error("레슨을 찾지 못했어요.");
 
+                currentQuizUrl = `${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${lesson.sequence}/${label}`;
                 const state = await getInitialState<LessonInitialState>(`${goormUrl}/learn/lecture/${sequence}/${lecture.url_slug}/lesson/${lesson.sequence}/${label}`, JSON.parse(session.accessToken));
                 const quiz = state.lesson.quiz;
 
-                webviewProvider.setHTML(`<html>
-                    <head>
-                        <style>
-                            body {
-                                padding: 5px;
-                                display: flex;
-                                flex-direction: column;
-                            }
-                            .desc {
-                                display: flex;
-                                flex-direction: column;
-                                gap: 3px;
-                            }
-                            
-                            .sep {
-                                margin-top: 5px;
-                                margin-bottom: 5px;
-                                width: 100%;
-                                height: .5px;
-                                backgroud-color: #fff;
-                            }
-
-                            .desc .title {
-                                margin-left: 5px;
-                                opacity: 0.5;
-                                font-size: 0.7rem;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <span>에디터의 오른쪽 위 제출 버튼을 눌러 제출해요.</span>
-                        <div class="desc">
-                            ${quiz.contents}
-                        </div>
-                        <div class="sep"></div>
-                        <div class="desc">
-                            <span class="title">입력 예시</span>
-                            ${quiz.inputExample.map(v => `<span class="content">${v.replaceAll("\n", "<br>")}</span>`)}
-                        </div>
-                        <div class="sep"></div>
-                        <div class="desc">
-                            <span class="title">출력 예시</span>
-                            ${quiz.outputExample.map(v => `<span class="content">${v.replaceAll("\n", "<br>")}</span>`)}
-                        </div>
-                        <div class="sep"></div>
-                    </body>
-                </html>`);
+                webviewProvider.setHTML(getHTML({
+                    "contents": quiz.contents,
+                    "inputExample": quiz.inputExample,
+                    "outputExample": quiz.outputExample
+                }));
 
                 await vscode.window.showTextDocument(doc);
+
+                quizSocket = new SocketIO(goormUrl, {
+                    "cookies": JSON.parse(session.accessToken)
+                });
+                await quizSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
@@ -395,14 +372,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
             }
         }),
+    );
 
-    ];
-
+    // 이벤트 푸시
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(async (e) => {
             if (!e) return;
             const uri = e.document.uri;
             if (!uri.query.startsWith("goorm")) {
+                currentQuizUrl = undefined;
+                currentProject = undefined;
                 vscode.commands.executeCommand(
                     "setContext",
                     "goorm-ide.isEditingSource",
@@ -418,46 +397,68 @@ export async function activate(context: vscode.ExtensionContext) {
             );
         }),
         vscode.workspace.onWillSaveTextDocument((e) => {
-            e.waitUntil(new Promise(async (resolve) => {
-                const data = {
-                    "lectureIndex": "",
-                    "examIndex": "les_XMapk_1773133335150",
-                    "quizIndex": "q_WfFlf_1773133328935",
-                    "form": "programming",
+            e.waitUntil(new Promise<void>(async (resolve) => {
+                if (!loggedIn)
+                    throw new Error("로그인해주세요!");
+
+                const rawSession = await context.secrets.get("session");
+                const goormUrl = await context.secrets.get("goormUrl");
+
+                if (!rawSession || !goormUrl) {
+                    for await (const item of await treeProvider.getChildren()) {
+                        treeProvider.removeItem(item.id);
+                    }
+                    throw new Error("재로그인해주세요!");
+                }
+
+                if (!selectedLectureIndex) throw new Error("수업을 선택해주세요!");
+                if (!currentQuizUrl) throw new Error("과제를 선택해주세요!");
+                if (!currentProject) throw new Error("과제를 선택해주세요!");
+
+                const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+
+                const r = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+
+                const saveStatus = await axios.post("https://sunrint-hs.goorm.io/api/workspace/save", {
+                    "lectureIndex": r.lecture.index,
+                    "examIndex": r.lesson.index,
+                    "quizIndex": r.lesson.tutorial_quiz_index,
+                    "form": r.lesson.quiz_form,
                     "project": {
-                        "projectKey": "programming.c",
-                        "language": "c",
-                        "langVersion": "17",
-                        "projectCode": "programming.c",
-                        "label": "C",
-                        "mainFiletype": "c",
+                        ...currentProject,
                         "files": [
                             {
-                                "filepath": "",
-                                "filename": "Main.c",
-                                "label": "C",
-                                "isDir": false,
-                                "isMain": true,
+                                ...currentProject.files[0],
                                 "content": [
                                     {
                                         "hidden": false,
                                         "readonly": false,
-                                        "source": "#include <stdio.h>\n\nint main() {\n\tchar str[20];\n\tscanf(\"%s\", str);\n\tprintf(\"입력한 문자열: %s\", str);\n\n\treturn 0;\n}"
+                                        "source": e.document.getText().trim()
                                     }
                                 ]
                             }
                         ]
                     },
                     "userId": "117367227022516387857_o6263_google",
-                    "removedBookmarks": []
-                };
+                    "removedBookmarks": [],
+                    "collaborationRoomId": "117367227022516387857_o6263_google",
+                    "collaborationRoomType": "user"
+                }, {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken)),
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                if (!saveStatus.data?.saved)
+                    vscode.window.showErrorMessage("알 수 없는 오류로 저장에 실패헀어요.");
+
+                resolve();
             }));
-        }),
+        })
     );
 
     await restoreSession();
-
-    context.subscriptions.push(...commands);
 }
 
 export async function deactivate() {
