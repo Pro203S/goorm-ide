@@ -552,12 +552,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
-                const available = await axios.get("https://sunrint-hs.goorm.io/api/ot/available", {
+                const available = await axios.get<APIOtAvailable>("https://sunrint-hs.goorm.io/api/ot/available", {
                     "headers": {
                         "cookie": stringifyCookie(JSON.parse(session.accessToken))
                     }
                 });
-                console.log(available);
+
+                if (debugSocket) {
+                    debugSocket.close();
+                }
+
+                // TODO: 디버그 소켓
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
