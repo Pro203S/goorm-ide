@@ -361,7 +361,30 @@ export async function activate(context: vscode.ExtensionContext) {
                 quizSocket = new SocketIO(goormUrl, {
                     "cookies": JSON.parse(session.accessToken)
                 });
-                await quizSocket.connect();
+
+                quizSocket.on("error", (error: Error) => {
+                    vscode.window.showErrorMessage("구름EDU: " + error.message);
+                });
+
+                quizSocket.on("connect", () => {
+                    quizSocket?.send("enterance_to_lesson", {
+                        "user_id": session.id,
+                        "lesson_index": state.lesson.index,
+                        "room_id": session.id,
+                        "room_type": "user",
+                        "lecture_index": state.lecture.index,
+                        "channel_index": state.channel.index
+                    });
+                    quizSocket?.send("enterance_to_quiz", {
+                        "lectureIndex": state.lecture.index,
+                        "examIndex": state.lesson.index,
+                        "quizIndex": state.lesson.tutorial_quiz_index,
+                        "userId": session.id,
+                        "isLesson": true
+                    });
+                });
+
+                quizSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

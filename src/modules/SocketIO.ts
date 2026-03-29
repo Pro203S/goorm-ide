@@ -13,7 +13,7 @@ export default class SocketIO {
         private opts?: {
             cookies?: Record<string, string>;
         }
-    ) {}
+    ) { }
 
     private buildCookie() {
         if (!this.opts?.cookies) return "";
@@ -22,7 +22,7 @@ export default class SocketIO {
             .join("; ");
     }
 
-    async connect() {
+    connect() {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
         this.ws = new WebSocket(
@@ -43,27 +43,44 @@ export default class SocketIO {
             console.log("closed", code, Buffer.from(reason).toString("utf-8"));
         });
 
+        let received40 = false;
+
         // 4️⃣ 메시지 처리
         this.ws.on("message", (msg) => {
-            const str = msg.toString();
-            console.log("D", str);
+            try {
+                const str = msg.toString();
+                console.log("D", str);
 
-            // ping
-            if (str === "2") {
-                console.log("S", "3");
-                this.ws?.send("3");
-                return;
+                // ping
+                if (str === "2") {
+                    this.ws?.send("3");
+                    return;
+                }
+
+                // 연결 처리
+                if (str.startsWith("0")) {
+                    this.ws?.send("40");
+                    return;
+                }
+
+                if (str.startsWith("40") && !received40) {
+                    received40 = true;
+                    const obj = JSON.parse(str.slice(2));
+                    this.sid = obj.sid;
+                    this.emitLocal("connect", this.sid);
+                    return;
+                }
+
+                // event
+                if (str.startsWith("42")) {
+                    const [event, data] = JSON.parse(str.slice(2));
+                    this.emitLocal(event, data);
+                }
+            } catch (err) {
+                const e = err as Error;
+                this.emitLocal("error", e);
+                this.close();
             }
-
-            // event
-            if (str.startsWith("42")) {
-                const [event, data] = JSON.parse(str.slice(2));
-                this.emitLocal(event, data);
-            }
-        });
-
-        return new Promise<void>((resolve) => {
-            this.ws?.once("open", () => resolve());
         });
     }
 
