@@ -36,7 +36,7 @@ export default class SocketIO {
 
         this.ws.on("close", (code, reason) => {
             if (code - 1000 < 1000) return;
-            
+
             console.log("Goorm socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
@@ -74,7 +74,7 @@ export default class SocketIO {
         });
 
         return new Promise<void>(resolve => {
-            this.ws.on("message", (msg) => {
+            const listener = (msg: RawData) => {
                 try {
                     const str = msg.toString();
 
@@ -82,6 +82,7 @@ export default class SocketIO {
                         received40 = true;
                         const obj = JSON.parse(str.slice(2));
                         this.sid = obj.sid;
+                        this.ws.off("message", listener);
                         resolve();
                         return;
                     }
@@ -90,7 +91,8 @@ export default class SocketIO {
                     this.emitLocal("error", e);
                     this.close();
                 }
-            });
+            };
+            this.ws.on("message", listener);
         });
     }
 

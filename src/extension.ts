@@ -561,8 +561,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
                 const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
-                console.log(state);
-                const file = currentProject.files[0];
 
                 quizSocket.send("build_in_container", {
                     "filetype": currentProject.mainFiletype,
@@ -583,9 +581,19 @@ export async function activate(context: vscode.ExtensionContext) {
                     "collaboration": true
                 });
 
+                const containerComplete = await quizSocket.waitUntil("container_complete");
+                const containerSocket = containerComplete.socket;
+                console.log(containerComplete);
+
                 if (debugSocket) {
                     debugSocket.close();
                 }
+
+                debugSocket = new DebugSocket(`${containerSocket.options.secure ? "wss" : "ws"}://${containerSocket.url}${containerSocket.options.path}`, quizSocket.sid, {
+                    "cookies": JSON.parse(session.accessToken)
+                });
+
+                await debugSocket.connect();
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

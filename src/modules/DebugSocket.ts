@@ -25,9 +25,9 @@ export default class DebugSocket {
     async connect() {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
-        console.log("Debug socket connecting to ", `${wsUrl}/socket.io/?EIO=4&transport=websocket&sid=${this.sid}`);
+        console.log("Debug socket connecting to ", `${wsUrl}/?EIO=4&transport=websocket&sid=${this.sid}`);
         this.ws = new WebSocket(
-            `${wsUrl}/socket.io/?EIO=4&transport=websocket&sid=${this.sid}`,
+            `${wsUrl}/?EIO=4&transport=websocket&sid=${this.sid}`,
             {
                 headers: {
                     Cookie: this.buildCookie()
@@ -63,7 +63,7 @@ export default class DebugSocket {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("D", str);
+                console.log("DEBUG D", str);
             } catch (err) {
                 const e = err as Error;
                 this.emitLocal("error", e);
@@ -72,17 +72,16 @@ export default class DebugSocket {
         });
 
         return new Promise<void>(resolve => {
-            this.ws.on("message", (msg) => {
+            const listener = async (msg: RawData) => {
                 try {
                     const str = msg.toString();
-
-                    resolve();
                 } catch (err) {
                     const e = err as Error;
                     this.emitLocal("error", e);
                     this.close();
                 }
-            });
+            }
+            this.ws.on("message", listener);
         });
     }
 
