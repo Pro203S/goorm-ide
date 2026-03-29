@@ -20,6 +20,8 @@ let currentQuizUrl: string | undefined = undefined;
 let currentProject: APIWorkspaceLesson["result"]["project"][string] | undefined = undefined;
 let quizSocket: SocketIO | undefined = undefined;
 let debugSocket: SocketIO | undefined = undefined;
+let changeSelectionEvent: vscode.Disposable | undefined = undefined;
+let changeSelection: TreeViewItem | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     if (!fs.existsSync(goormTemp))
@@ -30,6 +32,10 @@ export async function activate(context: vscode.ExtensionContext) {
         treeDataProvider: treeProvider
     });
     context.subscriptions.push(treeView);
+
+    changeSelectionEvent = treeView.onDidChangeSelection((e) => {
+        changeSelection = e.selection[0];
+    });
 
     const authProvider = new AuthenticationProvider("https://sunrint-hs.goorm.io");
     context.subscriptions.push(
@@ -258,15 +264,15 @@ export async function activate(context: vscode.ExtensionContext) {
                 for (const curriculum of curriculumData) {
                     const item = new TreeViewItem({
                         "id": curriculum.index,
-                        "label": curriculum.name,
+                        "label": curriculum.name + " " + curriculum.index,
                         "collapsibleState": vscode.TreeItemCollapsibleState.Collapsed,
-                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : undefined
+                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
                     });
                     treeProvider.addItem(item);
                     for (const lesson of curriculum.lessons) {
                         treeProvider.addChildren(item.id, new TreeViewItem({
                             "id": lesson.index,
-                            "label": lesson.name,
+                            "label": lesson.name + " " + lesson.index,
                             "collapsibleState": vscode.TreeItemCollapsibleState.None,
                             "icon": (() => {
                                 if (lesson.score === 100) return new vscode.ThemeIcon("check");
@@ -372,6 +378,11 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage("구름EDU: " + error.message);
                 });
 
+                quizSocket.on("close", ({ code, reason }) => {
+                    vscode.window.showErrorMessage("구름EDU: 소켓이 닫혔어요. " + code + " " + Buffer.from(reason).toString("utf-8"));
+                    quizSocket = undefined;
+                });
+
                 await quizSocket.connect();
 
                 quizSocket?.send("enterance_to_lesson", {
@@ -402,6 +413,9 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("goorm-ide.submitQuiz", async () => {
             try {
                 let cookieString: string | undefined = undefined;
+                if (changeSelectionEvent)
+                    changeSelectionEvent.dispose();
+
                 const r = await vscode.window.withProgress<SubmitQuizResponse>({
                     "location": vscode.ProgressLocation.Notification,
                     "title": "제출하고 있습니다...",
@@ -452,35 +466,16 @@ export async function activate(context: vscode.ExtensionContext) {
                         "useTextbook": false
                     });
 
-                    const data = await quizSocket.waitUntil(event);
                     quizSocket.off("close", closeListener);
+                    const data = await quizSocket.waitUntil(event, 7000);
                     return Promise.resolve(data);
                 });
 
-                if (!currentQuizUrl || !cookieString) throw new Error("알 수 없는 오류가 발생했어요.");
+                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("알 수 없는 오류가 발생했어요.");
 
                 const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(cookieString));
 
-                for await (const item of await treeProvider.getChildren()) {
-                    if (item.id === "sessionState") continue;
-
-                    treeProvider.removeItem(item.id);
-                    treeProvider.refresh();
-                }
-
-                await vscode.commands.executeCommand("goorm-ide.selectLearn", state.lecture.sequence);
-
-                for await (const lecture of await treeProvider.getChildren()) {
-                    for await (const item of await treeProvider.getChildren(lecture)) {
-                        if (item.id !== state.lesson.index) continue;
-
-                        await treeView.reveal(item, {
-                            "select": true,
-                            "expand": true,
-                            "focus": true
-                        });
-                    }
-                }
+                console.log(changeSelection, state.lecture.curriculumData.find(v => v.index === changeSelection?.id));
 
                 if (r.solved) {
                     vscode.window.showInformationMessage("정답입니다.");
@@ -495,6 +490,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     "goorm-ide.isEditingSource",
                     false
                 );
+            } finally {
+                changeSelectionEvent = treeView.onDidChangeSelection((e) => {
+                    changeSelection = e.selection[0];
+                });
             }
         })
     );

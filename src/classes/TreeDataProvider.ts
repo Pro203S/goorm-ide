@@ -19,6 +19,17 @@ export default class TreeDataProvider implements vscode.TreeDataProvider<TreeVie
         return Promise.resolve(this._children[element.id] ?? []);
     }
 
+    getParent(element: TreeViewItem): vscode.ProviderResult<TreeViewItem> {
+        const parents = Object.keys(this._children);
+        for (const parentKey of parents) {
+            const parent = this._children[parentKey];
+            const found = parent.find(v => v.id === element.id);
+            if (!found) continue;
+
+            return found;
+        }
+    }
+
     addItem(item: TreeViewItem) {
         this._items.push(item);
         this.refresh();

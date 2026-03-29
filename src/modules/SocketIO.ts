@@ -1,4 +1,4 @@
-import WebSocket from "ws";
+import WebSocket, { RawData } from "ws";
 
 type Listener = (data: any) => void;
 
@@ -34,12 +34,8 @@ export default class SocketIO {
             }
         );
 
-        // 3️⃣ 연결 처리
-        this.ws.on("open", () => {
-            this.ws.send("40"); // socket.io connect
-        });
-
         this.ws.on("close", (code, reason) => {
+            console.log("Goorm socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
 
@@ -134,18 +130,27 @@ export default class SocketIO {
         }
     }
 
-    async waitUntil<T = any>(event: string): Promise<T> {
-        return new Promise((resolve) => {
-            this.ws.on("message", (msg) => {
+    async waitUntil<T = any>(event: string, timeout?: number): Promise<T> {
+        return new Promise((resolve, reject) => {
+            const listener = (msg: RawData) => {
                 const str = msg.toString();
+
+                if (timeout) {
+                    setTimeout(() => {
+                        reject(new Error("Timeout exceeded."));
+                        this.ws.off("message", listener);
+                    }, timeout);
+                }
 
                 if (str.startsWith("42")) {
                     const [ev, data] = JSON.parse(str.slice(2));
                     if (ev === event) {
+                        this.ws.off("message", listener);
                         return resolve(data);
                     }
                 }
-            });
+            };
+            this.ws.on("message", listener);
         });
     }
 

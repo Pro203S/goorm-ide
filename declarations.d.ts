@@ -513,6 +513,7 @@ declare global {
             id: string;
             student_count: number;
             origin_channel_index: string;
+            curriculumData: APILearn["curriculumData"]
 
             category: {
                 first: {
