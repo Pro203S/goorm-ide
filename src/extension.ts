@@ -532,6 +532,36 @@ export async function activate(context: vscode.ExtensionContext) {
                     changeSelection = e.selection[0];
                 });
             }
+        }),
+        vscode.commands.registerCommand("goorm-ide.runCode", async () => {
+            try {
+                if (!loggedIn)
+                    throw new Error("로그인해주세요!");
+
+                const rawSession = await context.secrets.get("session");
+                const goormUrl = await context.secrets.get("goormUrl");
+
+                if (!rawSession || !goormUrl) {
+                    for await (const item of await treeProvider.getChildren()) {
+                        treeProvider.removeItem(item.id);
+                    }
+                    throw new Error("재로그인해주세요!");
+                }
+
+                if (!selectedLectureIndex) throw new Error("수업을 선택해주세요!");
+
+                const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+
+                const available = await axios.get("https://sunrint-hs.goorm.io/api/ot/available", {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                    }
+                });
+                console.log(available);
+            } catch (err) {
+                const e = err as Error;
+                vscode.window.showErrorMessage("구름EDU: " + e.message);
+            }
         })
     );
 

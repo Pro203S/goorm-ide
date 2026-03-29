@@ -47,7 +47,6 @@ export default class SocketIO {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("D", str);
 
                 // ping
                 if (str === "2") {
@@ -98,7 +97,6 @@ export default class SocketIO {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
-        console.log("S", payload);
         this.ws.send(payload);
     }
 

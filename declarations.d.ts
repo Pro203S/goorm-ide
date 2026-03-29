@@ -600,6 +600,14 @@ declare global {
         "score"?: number,
         "total_score"?: number
     };
+
+    type APIOtAvailable = {
+        "proxyHost": string,
+        "proxySecure": boolean,
+        "result": boolean,
+        "host": string,
+        "port": number
+    }
 }
 
 export { };
