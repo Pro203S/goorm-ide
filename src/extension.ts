@@ -264,7 +264,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 for (const curriculum of curriculumData) {
                     const item = new TreeViewItem({
                         "id": curriculum.index,
-                        "label": curriculum.name + " " + curriculum.index,
+                        "label": curriculum.name,
                         "collapsibleState": vscode.TreeItemCollapsibleState.Collapsed,
                         "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
                     });
@@ -288,7 +288,7 @@ export async function activate(context: vscode.ExtensionContext) {
                                 "arguments": [
                                     curriculum.index,
                                     lesson.index,
-                                    curriculum.name + " " + lesson.name,
+                                    curriculum.name,
                                     sequence,
                                     lesson.name
                                 ]
