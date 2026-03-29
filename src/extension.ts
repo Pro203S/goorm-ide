@@ -152,8 +152,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
-                const r = await axios.post(`${goormUrl}/api/lecture/${selectedLectureIndex}/always-attendance/attendance`, {
-                    "data": "{}",
+                const r = await axios.post(`${goormUrl}/api/lecture/${selectedLectureIndex}/always-attendance/attendance`, {}, {
                     "headers": {
                         "cookie": stringifyCookie(JSON.parse(session.accessToken)),
                         "Content-Type": "application/json"
@@ -161,7 +160,23 @@ export async function activate(context: vscode.ExtensionContext) {
                     "withCredentials": true,
                     "validateStatus": () => true
                 });
-                console.log(r.status, r.data);
+                if (r.status !== 200) {
+                    if (r.status === 403) {
+                        vscode.window.showInformationMessage("이미 출석했어요.");
+                        return;
+                    }
+
+                    if (r.status === 401) {
+                        for await (const item of await treeProvider.getChildren()) {
+                            treeProvider.removeItem(item.id);
+                        }
+                        throw new Error("재로그인해주세요!");
+                    }
+
+                    throw new Error("Request failed with status code " + r.status);
+                }
+
+                vscode.window.showInformationMessage("현재 수업에 출석했어요.");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
