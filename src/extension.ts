@@ -272,7 +272,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     for (const lesson of curriculum.lessons) {
                         treeProvider.addChildren(item.id, new TreeViewItem({
                             "id": lesson.index,
-                            "label": lesson.name + " " + lesson.index,
+                            "label": lesson.name,
                             "collapsibleState": vscode.TreeItemCollapsibleState.None,
                             "icon": (() => {
                                 if (lesson.score === 100) return new vscode.ThemeIcon("check");
@@ -345,7 +345,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
 
                 const filePath = path.join(goormTemp, sanitizeFileName(name) + ".c");
-                const uri = vscode.Uri.parse(filePath + "?goorm");
+                const uri = vscode.Uri.parse("file:///" + filePath + "?goorm");
                 fs.writeFileSync(filePath, content, "utf-8");
 
                 const doc = await vscode.workspace.openTextDocument(uri);
