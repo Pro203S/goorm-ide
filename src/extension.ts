@@ -346,7 +346,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 );
 
                 const filePath = path.join(goormTemp, sanitizeFileName(name) + ".c");
-                const uri = vscode.Uri.parse("file:///" + filePath + "?goorm");
+                const uri = vscode.Uri.parse((process.platform === "win32" ? "file:///" : "") + filePath + "?goorm");
                 fs.writeFileSync(filePath, content, "utf-8");
 
                 const doc = await vscode.workspace.openTextDocument(uri);
