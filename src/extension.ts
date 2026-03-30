@@ -15,12 +15,30 @@ import SocketIO from './modules/SocketIO';
 import DebugSocket from './modules/DebugSocket';
 import DebugTerminal from './classes/DebugTerminal';
 
+axios.interceptors.request.use((config) => {
+    config.headers.set({
+        ...config.headers,
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "en-US,en;q=0.9,ko-KR;q=0.8,ko;q=0.7,ja-JP;q=0.6,ja;q=0.5",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "priority": "u=0, i",
+        "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "none",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    });
+    config.withCredentials = true;
+    return config;
+});
+
 axios.interceptors.response.use((config) => {
-    if (config.status < 300) {
-        console.log("goormEdu request", config.config.url, config.status);
-    } else {
-        console.log("goormEdu request", config.config.url, config.status, config.data);
-    }
+    console.log("[goormEdu] request", config.config.url, config.status);
     return config;
 });
 
@@ -71,6 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
             const r = await getInitialState(goormUrl, JSON.parse(session.accessToken));
+            console.log(r);
 
             loggedIn = true;
             treeProvider.addItem(new TreeViewItem({

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { stringifyCookie } from "cookie";
 
-let cache: Record<string, any> = {};
+//let cache: Record<string, any> = {};
 
 export default async function getInitialState<T = InitialState>(goormUrl: string, cookies: {
     "accounts.sid": string,
@@ -9,7 +9,7 @@ export default async function getInitialState<T = InitialState>(goormUrl: string
     "goormaccounts.sid": string,
     "goorm.lang": string
 }): Promise<T> {
-    if (cache[goormUrl]) return cache[goormUrl];
+    //if (cache[goormUrl]) return cache[goormUrl];
 
     const r = await axios.get<string>(goormUrl, {
         "headers": {
@@ -24,10 +24,12 @@ export default async function getInitialState<T = InitialState>(goormUrl: string
     const parsed = data[InitialStateIndex].trim().substring(toFind.length);
     const content = new Function(`return ${parsed}`)();
 
+    /*
     cache[goormUrl] = content;
     setTimeout(() => {
         delete cache[goormUrl];
     }, 2 * 60 * 60 * 1000);
+    */
 
     return content;
 }
