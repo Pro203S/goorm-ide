@@ -39,6 +39,8 @@ axios.interceptors.request.use((config) => {
 
 axios.interceptors.response.use((config) => {
     console.log("[goormEdu]", config.config.method ?? "get", config.config.url, config.status);
+    if (config.config.url?.includes("api"))
+        console.log("[goormEdu]", config.data);
     return config;
 });
 
@@ -54,6 +56,7 @@ let changeSelection: TreeViewItem | undefined = undefined;
 let currentTerminal: vscode.Terminal | undefined = undefined;
 let currentTerminalProvider: DebugTerminal | undefined = undefined;
 let currentTerminalDisposable: vscode.Disposable | undefined = undefined;
+let isQuizRunMode = false;
 
 export async function activate(context: vscode.ExtensionContext) {
     //#region 기본 세팅 
@@ -375,6 +378,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     const file = project.files[0];
                     const content = file.content[0].source;
                     currentProject = project;
+                    isQuizRunMode = r.data.result.quizMode === "run_mode";
 
                     vscode.commands.executeCommand(
                         "setContext",
@@ -489,6 +493,103 @@ export async function activate(context: vscode.ExtensionContext) {
                     return Promise.reject(new Error("재로그인해주세요!"));
                 }
 
+                await vscode.commands.executeCommand("workbench.action.files.save");
+
+                const refreshTreeView = async (c?: string) => {
+                    const cookie = cookieString || c;
+                    if (
+                        !cookie ||
+                        !changeSelection
+                    ) throw new Error("과제를 다시 선택해주세요.");
+
+                    if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
+                    if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
+
+                    const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
+                    const learn = await axios.get<APILearn>(goormUrl + "/api/learn", {
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(cookie))
+                        },
+                        "withCredentials": true,
+                        "params": {
+                            "sequence": seq
+                        }
+                    });
+                    const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
+                    if (!curriculum) throw new Error("커리큘럼을 찾을 수 없어요.");
+                    const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
+                    if (!lesson) throw new Error("과제를 찾을 수 없어요.");
+
+                    const treeItems = await treeProvider.getChildren();
+                    const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
+                    if (currIndexNumber === -1) throw new Error("커리큘럼을 찾을 수 없어요.");
+                    const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
+                    if (lessonIndexNumber === -1) throw new Error("과제를 찾을 수 없어요.");
+
+                    treeProvider.changeItem(currIndexNumber, new TreeViewItem({
+                        ...treeItems[currIndexNumber],
+                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
+                    }));
+                    treeProvider.changeChildren(treeItems[currIndexNumber].id, lessonIndexNumber, new TreeViewItem({
+                        ...(await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index)))[lessonIndexNumber],
+                        "icon": (() => {
+                            if (lesson.score === 100) return new vscode.ThemeIcon("check");
+
+                            switch (lesson.type) {
+                                case 'contents': return new vscode.ThemeIcon("three-bars");
+                                default: return new vscode.ThemeIcon("file-code");
+                            }
+                        })()
+                    }));
+                };
+
+                if (isQuizRunMode) {
+                    if (!loggedIn)
+                        return Promise.reject(new Error("로그인해주세요!"));
+
+                    if (!selectedLectureIndex) return Promise.reject(new Error("수업을 선택해주세요!"));
+
+                    const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+                    const document = vscode.window.activeTextEditor?.document;
+                    if (!quizSocket || !document || !currentQuizUrl || !currentProject) return Promise.reject(new Error("과제를 선택해주세요!"));
+
+                    const state: LessonInitialState = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+
+                    await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/run", new URLSearchParams({
+                        "tag": "run",
+                        "lectureIndex": selectedLectureIndex,
+                        "lessonIndex": state.lesson.index,
+                        "quizIndex": state.lesson.tutorial_quiz_index,
+                        "lectureType": state.lecture.type.toString(),
+                        "form": state.lesson.quiz_form,
+                        "lang": currentProject.language
+                    }).toString(), {
+                        "withCredentials": true,
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(session.accessToken)),
+                            "content-type": "application/x-www-form-urlencoded"
+                        }
+                    });
+                    const condition = await axios.put<{ isStateUpdated: boolean }>(goormUrl + "/api/userLesson/condition", {
+                        "condition": "resolveQuiz",
+                        "conditionState": 1,
+                        "lessonIndex": state.lesson.index
+                    }, {
+                        "withCredentials": true,
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(session.accessToken)),
+                            "content-type": "application/json"
+                        }
+                    });
+                    if (!condition.data.isStateUpdated) {
+                        vscode.window.showWarningMessage("오류로 인해 완료하지 못했습니다. 구름에서 제출해주세요.");
+                    } else {
+                        vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
+                    }
+                    await refreshTreeView(session.accessToken);
+                    return;
+                }
+
                 const r = await vscode.window.withProgress<SubmitQuizResponse>({
                     "location": vscode.ProgressLocation.Notification,
                     "title": "제출하고 있습니다...",
@@ -536,93 +637,22 @@ export async function activate(context: vscode.ExtensionContext) {
                     return Promise.resolve(data);
                 });
 
+
                 if (
                     !currentQuizUrl ||
-                    !cookieString ||
                     !changeSelection ||
-                    currentState === undefined ||
                     !currentProject ||
                     !selectedLectureIndex
                 ) throw new Error("과제를 다시 선택해주세요.");
 
                 if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
                 if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
-
-                const refreshTreeView = async () => {
-                    if (
-                        !currentQuizUrl ||
-                        !cookieString ||
-                        !changeSelection ||
-                        currentState === undefined ||
-                        !currentProject ||
-                        !selectedLectureIndex
-                    ) throw new Error("과제를 다시 선택해주세요.");
-
-                    if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
-                    if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
-
-                    const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
-                    const learn = await axios.get<APILearn>(goormUrl + "/api/learn", {
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(cookieString))
-                        },
-                        "withCredentials": true,
-                        "params": {
-                            "sequence": seq
-                        }
-                    });
-                    const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
-                    if (!curriculum) throw new Error("커리큘럼을 찾을 수 없어요.");
-                    const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
-                    if (!lesson) throw new Error("과제를 찾을 수 없어요.");
-
-                    const treeItems = await treeProvider.getChildren();
-                    const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
-                    if (currIndexNumber === -1) throw new Error("커리큘럼을 찾을 수 없어요.");
-                    const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
-                    if (lessonIndexNumber === -1) throw new Error("과제를 찾을 수 없어요.");
-
-                    treeProvider.changeItem(currIndexNumber, new TreeViewItem({
-                        ...treeItems[currIndexNumber],
-                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
-                    }));
-                    treeProvider.changeChildren(treeItems[currIndexNumber].id, lessonIndexNumber, new TreeViewItem({
-                        ...(await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index)))[lessonIndexNumber],
-                        "icon": (() => {
-                            if (lesson.score === 100) return new vscode.ThemeIcon("check");
-
-                            switch (lesson.type) {
-                                case 'contents': return new vscode.ThemeIcon("three-bars");
-                                default: return new vscode.ThemeIcon("file-code");
-                            }
-                        })()
-                    }));
-                };
+                if (!cookieString || currentState === undefined) throw new Error("과제를 다시 선택해주세요.");
 
                 //#region 제출 API 호출 코드
                 const state: LessonInitialState = currentState;
 
-                if (r.quizState === undefined) {
-                    const run = await axios.put<{ isStateUpdated: boolean }>(goormUrl + "/api/userLesson/condition", {
-                        "condition": "resolveQuiz",
-                        "conditionState": 1,
-                        "lessonIndex": state.lesson.index
-                    }, {
-                        "withCredentials": true,
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(cookieString)),
-                            "content-type": "application/json"
-                        }
-                    });
-                    if (!run.data.isStateUpdated) {
-                        return Promise.reject(new Error("제출 API 호출에 실패했어요."));
-                    }
-                    vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
-                    await refreshTreeView();
-                    return;
-                }
-
-                const submit = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/submit", new URLSearchParams({
+                await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/submit", new URLSearchParams({
                     "tag": "submit",
                     "lectureIndex": selectedLectureIndex,
                     "lessonIndex": state.lesson.index,
@@ -637,9 +667,6 @@ export async function activate(context: vscode.ExtensionContext) {
                         "content-type": "application/x-www-form-urlencoded"
                     }
                 });
-                if (!submit.data.data) {
-                    return Promise.reject(new Error("제출 API 호출에 실패했어요."));
-                }
 
                 await refreshTreeView();
 
@@ -676,192 +703,187 @@ export async function activate(context: vscode.ExtensionContext) {
                     "location": vscode.ProgressLocation.Notification,
                     "cancellable": false
                 }, async () => {
-                    if (!loggedIn) return Promise.reject(new Error("로그인해주세요!"));
+                    return new Promise<void>(async (resolve, reject) => {
+                        if (!loggedIn) return reject(new Error("로그인해주세요!"));
 
-                    const rawSession = await context.secrets.get("session");
-                    const goormUrl = await context.secrets.get("goormUrl");
+                        const rawSession = await context.secrets.get("session");
+                        const goormUrl = await context.secrets.get("goormUrl");
 
-                    if (!rawSession || !goormUrl) {
-                        for await (const item of await treeProvider.getChildren()) {
-                            treeProvider.removeItem(item.id);
+                        if (!rawSession || !goormUrl) {
+                            for await (const item of await treeProvider.getChildren()) {
+                                treeProvider.removeItem(item.id);
+                            }
+                            return reject(new Error("재로그인해주세요!"));
                         }
-                        return Promise.reject(new Error("재로그인해주세요!"));
-                    }
 
-                    const document = vscode.window.activeTextEditor;
-                    if (
-                        !selectedLectureIndex ||
-                        !quizSocket ||
-                        !quizSocket.sid ||
-                        !currentQuizUrl ||
-                        !currentProject ||
-                        !document
-                    ) return Promise.reject(new Error("수업을 선택해주세요!"));
+                        const document = vscode.window.activeTextEditor;
+                        if (
+                            !selectedLectureIndex ||
+                            !quizSocket ||
+                            !quizSocket.sid ||
+                            !currentQuizUrl ||
+                            !currentProject ||
+                            !document
+                        ) return reject(new Error("수업을 선택해주세요!"));
 
-                    const session: vscode.AuthenticationSession = JSON.parse(rawSession);
-                    const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+                        const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+                        const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
 
-                    quizSocket.send("run_in_collaboration", {
-                        "type": "term",
-                        "target": currentProject.label
-                    });
-
-                    quizSocket.send("build_in_container", {
-                        "filetype": currentProject.mainFiletype,
-                        "form": state.lesson.quiz_form,
-                        "href": currentQuizUrl,
-                        "input": "",
-                        "output": "",
-                        "lang": "c",
-                        "label": "C",
-                        "lecture_index": selectedLectureIndex,
-                        "lesson_index": state.lesson.index,
-                        "quiz_index": state.lesson.tutorial_quiz_index,
-                        "show_runtime": true,
-                        "source": [
-                            document.document.getText()
-                        ],
-                        "stat": false,
-                        "collaboration": true
-                    });
-
-                    const containerComplete: ContainerCompleteResponse = await quizSocket.waitUntil("container_complete");
-                    const containerSocket = containerComplete.socket;
-
-                    //#region 정리
-                    if (debugSocket) {
-                        debugSocket.close();
-                    }
-
-                    if (currentTerminal) {
-                        currentTerminal.dispose();
-                    }
-
-                    if (currentTerminalProvider) {
-                        currentTerminalProvider.close();
-                    }
-
-                    if (currentTerminalDisposable) {
-                        currentTerminalDisposable.dispose();
-                    }
-                    //#endregion
-
-                    const date36radix = () => new Date().getTime().toString(36);
-                    const socketUrl = `${containerSocket.options.secure ? "https" : "http"}://${containerSocket.url}${containerSocket.options.path}/`;
-                    const pollingSid = await axios.get<string>(socketUrl, {
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(session.accessToken))
-                        },
-                        "params": {
-                            "EIO": 4,
-                            "transport": "polling",
-                            "t": date36radix()
-                        }
-                    });
-
-                    const pollingSidData = JSON.parse(pollingSid.data.slice(1));
-                    const sid = pollingSidData.sid;
-
-                    const pollingMustBeOk = await axios.post<string>(socketUrl, "40", {
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(session.accessToken))
-                        },
-                        "params": {
-                            "EIO": 4,
-                            "transport": "polling",
-                            "t": date36radix(),
-                            "sid": sid
-                        }
-                    });
-                    if (pollingMustBeOk.data !== "ok") return Promise.reject(new Error("예기치 않은 문제가 발생했어요. (polling)"));
-
-                    const pollingRun = await axios.post<string>(socketUrl, `42${JSON.stringify([
-                        "run",
-                        {
-                            "token": containerComplete.token,
-                            "daemon": containerComplete.daemon,
-                            "app": containerComplete.app,
-                            "main": containerComplete.main,
-                            "run_option": containerComplete.run_option,
-                            "stat": false,
-                            "tty_mode": false,
-                            "collaboration": true
-                        }
-                    ])}`, {
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(session.accessToken))
-                        },
-                        "params": {
-                            "EIO": 4,
-                            "transport": "polling",
-                            "t": date36radix(),
-                            "sid": sid
-                        }
-                    });
-                    if (pollingRun.data !== "ok") return Promise.reject(new Error("예기치 않은 문제가 발생했어요. (run)"));
-
-                    debugSocket = new DebugSocket(
-                        socketUrl,
-                        sid
-                    );
-
-                    currentTerminalProvider = new DebugTerminal();
-                    currentTerminal = vscode.window.createTerminal({
-                        "name": "구름EDU",
-                        "pty": currentTerminalProvider
-                    });
-
-                    currentTerminal.show();
-
-                    currentTerminalDisposable = currentTerminalProvider.onDidInput((e) => {
-                        debugSocket?.send("pty_execute_command", {
-                            "index": containerComplete.token,
-                            "command": e
+                        quizSocket.send("run_in_collaboration", {
+                            "type": "term",
+                            "target": currentProject.label
                         });
-                    });
 
-                    debugSocket.on("terminal_error", (data) => {
-                        if (!currentTerminalProvider) {
-                            vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
-                            return;
+                        quizSocket.send("build_in_container", {
+                            "filetype": currentProject.mainFiletype,
+                            "form": state.lesson.quiz_form,
+                            "href": currentQuizUrl,
+                            "input": "",
+                            "output": "",
+                            "lang": "c",
+                            "label": "C",
+                            "lecture_index": selectedLectureIndex,
+                            "lesson_index": state.lesson.index,
+                            "quiz_index": state.lesson.tutorial_quiz_index,
+                            "show_runtime": true,
+                            "source": [
+                                document.document.getText()
+                            ],
+                            "stat": false,
+                            "collaboration": true
+                        });
+
+                        quizSocket.on("container_fail", (data: { "err_msg": string }) => {
+                            reject(new Error("컴파일에 실패했어요.\n\n" + data.err_msg));
+                        });
+
+                        const containerComplete: ContainerCompleteResponse = await quizSocket.waitUntil("container_complete");
+                        const containerSocket = containerComplete.socket;
+
+                        //#region 정리
+                        if (debugSocket) {
+                            debugSocket.close();
                         }
 
-                        currentTerminalProvider.write(data.err_msg);
-                    });
-
-                    debugSocket.on("pty_command_result", (data) => {
-                        if (!currentTerminalProvider) {
-                            vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
-                            return;
+                        if (currentTerminal) {
+                            currentTerminal.dispose();
                         }
 
-                        currentTerminalProvider.write(data.stdout);
-                    });
-
-                    debugSocket.on("terminal_exited." + containerComplete.token, () => {
-                        if (!debugSocket) {
-                            vscode.window.showErrorMessage("예기치 않은 오류가 발생했어요.");
-                            return;
+                        if (currentTerminalProvider) {
+                            currentTerminalProvider.close();
                         }
-                        debugSocket.sendRaw("41");
-                        debugSocket.close();
+
+                        if (currentTerminalDisposable) {
+                            currentTerminalDisposable.dispose();
+                        }
+                        //#endregion
+
+                        const date36radix = () => new Date().getTime().toString(36);
+                        const socketUrl = `${containerSocket.options.secure ? "https" : "http"}://${containerSocket.url}${containerSocket.options.path}/`;
+                        const pollingSid = await axios.get<string>(socketUrl, {
+                            "headers": {
+                                "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                            },
+                            "params": {
+                                "EIO": 4,
+                                "transport": "polling",
+                                "t": date36radix()
+                            }
+                        });
+
+                        const pollingSidData = JSON.parse(pollingSid.data.slice(1));
+                        const sid = pollingSidData.sid;
+
+                        const pollingMustBeOk = await axios.post<string>(socketUrl, "40", {
+                            "headers": {
+                                "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                            },
+                            "params": {
+                                "EIO": 4,
+                                "transport": "polling",
+                                "t": date36radix(),
+                                "sid": sid
+                            }
+                        });
+                        if (pollingMustBeOk.data !== "ok") return reject(new Error("예기치 않은 문제가 발생했어요. (polling)"));
+
+                        const pollingRun = await axios.post<string>(socketUrl, `42${JSON.stringify([
+                            "run",
+                            {
+                                "token": containerComplete.token,
+                                "daemon": containerComplete.daemon,
+                                "app": containerComplete.app,
+                                "main": containerComplete.main,
+                                "run_option": containerComplete.run_option,
+                                "stat": false,
+                                "tty_mode": false,
+                                "collaboration": true
+                            }
+                        ])}`, {
+                            "headers": {
+                                "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                            },
+                            "params": {
+                                "EIO": 4,
+                                "transport": "polling",
+                                "t": date36radix(),
+                                "sid": sid
+                            }
+                        });
+                        if (pollingRun.data !== "ok") return reject(new Error("예기치 않은 문제가 발생했어요. (run)"));
+
+                        debugSocket = new DebugSocket(
+                            socketUrl,
+                            sid
+                        );
+
+                        currentTerminalProvider = new DebugTerminal();
+                        currentTerminal = vscode.window.createTerminal({
+                            "name": "구름EDU",
+                            "pty": currentTerminalProvider
+                        });
+
+                        currentTerminal.show();
+
+                        currentTerminalDisposable = currentTerminalProvider.onDidInput((e) => {
+                            debugSocket?.send("pty_execute_command", {
+                                "index": containerComplete.token,
+                                "command": e
+                            });
+                        });
+
+                        debugSocket.on("pty_command_result", (data) => {
+                            if (!currentTerminalProvider) {
+                                vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
+                                return;
+                            }
+
+                            currentTerminalProvider.write(data.stdout);
+                        });
+
+                        debugSocket.on("terminal_exited." + containerComplete.token, () => {
+                            if (!debugSocket) {
+                                vscode.window.showErrorMessage("예기치 않은 오류가 발생했어요.");
+                                return;
+                            }
+                            debugSocket.sendRaw("41");
+                            debugSocket.close();
+                        });
+
+                        debugSocket.on("close", () => {
+                            if (!currentTerminalProvider || !currentTerminalDisposable) return;
+
+                            if (currentTerminalProvider)
+                                currentTerminalProvider.write("\r\n프로세스가 종료되었습니다.");
+
+                            currentTerminalDisposable.dispose();
+                            return;
+                        });
+
+                        debugSocket.connect();
+
+                        return resolve();
                     });
-
-                    debugSocket.on("close", () => {
-                        if (!currentTerminalProvider || !currentTerminalDisposable) return;
-
-                        if (currentTerminalProvider)
-                            currentTerminalProvider.write("\r\n프로세스가 종료되었습니다.");
-
-                        currentTerminalDisposable.dispose();
-                        return;
-                    });
-
-                    await debugSocket.connect();
-
-                    currentTerminalProvider.write("> ");
-
-                    return Promise.resolve();
                 });
             } catch (err) {
                 const e = err as Error;

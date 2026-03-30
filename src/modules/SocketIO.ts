@@ -47,7 +47,6 @@ export default class SocketIO {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("[goormEdu]", "SocketDown", str);
                 
                 // ping
                 if (str === "2") {
@@ -66,6 +65,7 @@ export default class SocketIO {
                 // event
                 if (str.startsWith("42")) {
                     const [event, data] = JSON.parse(str.slice(2));
+                console.log("[goormEdu]", "SocketDown", event, data);
                     this.emitLocal(event, data);
                 }
             } catch (err) {
