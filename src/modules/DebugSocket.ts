@@ -9,31 +9,13 @@ export default class DebugSocket {
 
     constructor(
         private baseUrl: string,
-        private sid: string,
-        private token: string,
-        private opts?: {
-            cookies?: Record<string, string>;
-        }
+        private sid: string
     ) { }
-
-    private buildCookie() {
-        if (!this.opts?.cookies) return "";
-        return Object.entries(this.opts.cookies)
-            .map(([k, v]) => `${k}=${v}`)
-            .join("; ");
-    }
 
     async connect() {
         // 2️⃣ websocket 연결
         const wsUrl = this.baseUrl.replace(/^http/, "ws");
-        this.ws = new WebSocket(
-            `${wsUrl}/?EIO=4&transport=websocket&sid=${this.sid}`,
-            {
-                headers: {
-                    Cookie: this.buildCookie()
-                }
-            }
-        );
+        this.ws = new WebSocket(`${wsUrl}/?EIO=4&transport=websocket&sid=${this.sid}`);
 
         this.ws.on("error", (e) => {
             console.error("DEBUG SOCKET", e);
@@ -42,8 +24,6 @@ export default class DebugSocket {
         });
 
         this.ws.on("close", (code, reason) => {
-            if (code - 1000 < 1000) return;
-
             console.log("Debug socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
@@ -51,6 +31,7 @@ export default class DebugSocket {
         this.ws.on("open", () => {
             try {
                 console.log("debug socket open");
+                console.log("DEBUG S", "2probe");
                 this.ws.send("2probe");
             } catch (err) {
                 const e = err as Error;
@@ -64,6 +45,17 @@ export default class DebugSocket {
             try {
                 const str = msg.toString();
                 console.log("DEBUG D", str);
+
+                if (str === "2") {
+                    console.log("DEBUG S", "3");
+                    this.ws.send("3");
+                    return;
+                }
+
+                if (str.startsWith("42")) {
+                    const [ev, data] = JSON.parse(str.slice(2));
+                    this.emitLocal(ev, data);
+                }
             } catch (err) {
                 const e = err as Error;
                 this.emitLocal("error", e);
@@ -76,8 +68,16 @@ export default class DebugSocket {
                 try {
                     const str = msg.toString();
                     if (str === "3probe") {
+                        console.log("DEBUG S", "5");
                         this.ws.send("5");
+                        return;
+                    }
+
+                    if (str.startsWith("40")) {
+                        console.log("Debug connected");
                         resolve();
+                        this.ws.off("message", listener);
+                        return;
                     }
                 } catch (err) {
                     const e = err as Error;
@@ -93,6 +93,7 @@ export default class DebugSocket {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
+        console.log("DEBUG S", payload);
         this.ws.send(payload);
     }
 

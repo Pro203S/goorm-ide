@@ -601,12 +601,24 @@ declare global {
         "total_score"?: number
     };
 
-    type APIOtAvailable = {
-        "proxyHost": string,
-        "proxySecure": boolean,
-        "result": boolean,
-        "host": string,
-        "port": number
+    type ContainerCompleteResponse = {
+        "app": string,
+        "cwd": string,
+        "daemon": boolean,
+        "main": string,
+        "run_option": string,
+        "secure": boolean,
+        "socket": {
+            "url": string,
+            "options": {
+                "secure": boolean,
+                "force new connection": boolean,
+                "path": string,
+                "withCredentials": boolean
+            }
+        },
+        "token": string,
+        "user_id": string
     }
 }
 

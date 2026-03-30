@@ -390,7 +390,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 await quizSocket.connect();
 
-                quizSocket?.send("enterance_to_lesson", {
+                quizSocket.send("enterance_to_lesson", {
                     "user_id": session.id,
                     "lesson_index": state.lesson.index,
                     "room_id": session.id,
@@ -398,12 +398,33 @@ export async function activate(context: vscode.ExtensionContext) {
                     "lecture_index": state.lecture.index,
                     "channel_index": state.channel.index
                 });
-                quizSocket?.send("enterance_to_quiz", {
+                quizSocket.send("enterance_to_quiz", {
                     "lectureIndex": state.lecture.index,
                     "examIndex": state.lesson.index,
                     "quizIndex": state.lesson.tutorial_quiz_index,
                     "userId": session.id,
                     "isLesson": true
+                });
+
+                quizSocket.send("updateBrowserState", {
+                    "userId": state.userData.id,
+                    "lectureIndex": selectedLectureIndex,
+                    "lessonIndex": state.lesson.index,
+                    "isBrowserActive": true,
+                    "isOnline": true,
+                    "userData": state.userData,
+                    "channelIndex": state.channel.index
+                });
+
+                quizSocket.send("entrance_to_collaboration", {
+                    "lecture_index": selectedLectureIndex,
+                    "lesson_index": state.lesson.index,
+                    "collaboration_option": "personal",
+                    "owner_id": state.userData.id,
+                    "user_id": state.userData.id,
+                    "user_name": state.userData.name,
+                    "room_id": state.userData.id,
+                    "room_type": "user"
                 });
             } catch (err) {
                 const e = err as Error;
@@ -585,10 +606,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     "collaboration": true
                 });
 
-                const containerComplete = await quizSocket.waitUntil("container_complete");
+                const containerComplete: ContainerCompleteResponse = await quizSocket.waitUntil("container_complete");
                 const containerSocket = containerComplete.socket;
-                console.log(containerComplete);
 
+                //#region 정리
                 if (debugSocket) {
                     debugSocket.close();
                 }
@@ -604,6 +625,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (currentTerminalDisposable) {
                     currentTerminalDisposable.dispose();
                 }
+                //#endregion
 
                 const date36radix = () => new Date().getTime().toString(36);
                 const socketUrl = `${containerSocket.options.secure ? "https" : "http"}://${containerSocket.url}${containerSocket.options.path}/`;
@@ -620,27 +642,34 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const pollingSidData = JSON.parse(pollingSid.data.slice(1));
                 const sid = pollingSidData.sid;
-                console.log("polling sid:", sid);
+
+                const pollingMustBeOk = await axios.post<string>(socketUrl, "40", {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                    },
+                    "params": {
+                        "EIO": 4,
+                        "transport": "polling",
+                        "t": date36radix(),
+                        "sid": sid
+                    }
+                });
+                if (pollingMustBeOk.data !== "ok") throw new Error("예기치 않은 문제가 발생했어요.");
 
                 debugSocket = new DebugSocket(
                     socketUrl,
-                    sid,
-                    containerComplete.token,
-                    {
-                        "cookies": JSON.parse(session.accessToken)
-                    }
+                    sid
                 );
 
-                currentTerminalProvider = new DebugTerminal(debugSocket);
+                currentTerminalProvider = new DebugTerminal();
                 currentTerminal = vscode.window.createTerminal({
-                    "name": "Goorm Terminal",
+                    "name": "구름EDU",
                     "pty": currentTerminalProvider
                 });
 
                 currentTerminal.show();
 
-                currentTerminalDisposable = currentTerminalProvider.onDidWrite((e) => {
-                    console.log("sending pty_execute_command", e);
+                currentTerminalDisposable = currentTerminalProvider.onDidInput((e) => {
                     debugSocket?.send("pty_execute_command", {
                         "index": containerComplete.token,
                         "command": e
@@ -666,6 +695,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 });
 
                 await debugSocket.connect();
+
+                currentTerminalProvider.write("프로세스가 시작되었습니다.\r\n");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

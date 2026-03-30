@@ -1,13 +1,12 @@
 import * as vscode from "vscode";
-import DebugSocket from "../modules/DebugSocket";
 
 export default class DebugTerminal implements vscode.Pseudoterminal {
     private writeEmitter = new vscode.EventEmitter<string>();
+    private inputEmitter = new vscode.EventEmitter<string>();
     onDidWrite: vscode.Event<string> = this.writeEmitter.event;
+    onDidInput = this.inputEmitter.event;
 
-    constructor(
-        private socket: DebugSocket
-    ) { }
+    constructor() { }
 
     open() {
 
@@ -18,7 +17,10 @@ export default class DebugTerminal implements vscode.Pseudoterminal {
     }
 
     handleInput(data: string) {
-        this.writeEmitter.fire(data);
+        if (data === "\r")
+            return this.inputEmitter.fire("\r\n");
+        
+        this.inputEmitter.fire(data);
     }
 
     close() {
