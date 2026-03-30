@@ -573,6 +573,11 @@ export async function activate(context: vscode.ExtensionContext) {
                     })()
                 }));
 
+                if (!r.solved && r.saved) {
+                    vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
+                    return;
+                }
+
                 if (r.submit_mode) {
                     vscode.window.showInformationMessage("코드를 제출했습니다.");
                     return;
