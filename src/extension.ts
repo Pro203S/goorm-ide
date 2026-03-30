@@ -536,7 +536,6 @@ export async function activate(context: vscode.ExtensionContext) {
                     return Promise.resolve(data);
                 });
 
-                //#region 제출 API 호출 코드
                 if (
                     !currentQuizUrl ||
                     !cookieString ||
@@ -549,28 +548,77 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
                 if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
 
+                const refreshTreeView = async () => {
+                    if (
+                        !currentQuizUrl ||
+                        !cookieString ||
+                        !changeSelection ||
+                        currentState === undefined ||
+                        !currentProject ||
+                        !selectedLectureIndex
+                    ) throw new Error("과제를 다시 선택해주세요.");
+
+                    if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
+                    if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
+
+                    const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
+                    const learn = await axios.get<APILearn>(goormUrl + "/api/learn", {
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(cookieString))
+                        },
+                        "withCredentials": true,
+                        "params": {
+                            "sequence": seq
+                        }
+                    });
+                    const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
+                    if (!curriculum) throw new Error("커리큘럼을 찾을 수 없어요.");
+                    const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
+                    if (!lesson) throw new Error("과제를 찾을 수 없어요.");
+
+                    const treeItems = await treeProvider.getChildren();
+                    const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
+                    if (currIndexNumber === -1) throw new Error("커리큘럼을 찾을 수 없어요.");
+                    const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
+                    if (lessonIndexNumber === -1) throw new Error("과제를 찾을 수 없어요.");
+
+                    treeProvider.changeItem(currIndexNumber, new TreeViewItem({
+                        ...treeItems[currIndexNumber],
+                        "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
+                    }));
+                    treeProvider.changeChildren(treeItems[currIndexNumber].id, lessonIndexNumber, new TreeViewItem({
+                        ...(await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index)))[lessonIndexNumber],
+                        "icon": (() => {
+                            if (lesson.score === 100) return new vscode.ThemeIcon("check");
+
+                            switch (lesson.type) {
+                                case 'contents': return new vscode.ThemeIcon("three-bars");
+                                default: return new vscode.ThemeIcon("file-code");
+                            }
+                        })()
+                    }));
+                };
+
+                //#region 제출 API 호출 코드
                 const state: LessonInitialState = currentState;
 
                 if (r.quizState === undefined) {
-                    const run = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/run", new URLSearchParams({
-                        "tag": "submit",
-                        "lectureIndex": selectedLectureIndex,
-                        "lessonIndex": state.lesson.index,
-                        "quizIndex": state.lesson.tutorial_quiz_index,
-                        "lectureType": state.lecture.type.toString(),
-                        "form": state.lesson.quiz_form,
-                        "lang": currentProject.language
-                    }).toString(), {
+                    const run = await axios.put<{ isStateUpdated: boolean }>(goormUrl + "/api/userLesson/condition", {
+                        "condition": "resolveQuiz",
+                        "conditionState": 1,
+                        "lessonIndex": state.lesson.index
+                    }, {
                         "withCredentials": true,
                         "headers": {
                             "cookie": stringifyCookie(JSON.parse(cookieString)),
-                            "content-type": "application/x-www-form-urlencoded"
+                            "content-type": "application/json"
                         }
                     });
-                    if (!run.data) {
+                    if (!run.data.isStateUpdated) {
                         return Promise.reject(new Error("제출 API 호출에 실패했어요."));
                     }
                     vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
+                    await refreshTreeView();
                     return;
                 }
 
@@ -589,9 +637,11 @@ export async function activate(context: vscode.ExtensionContext) {
                         "content-type": "application/x-www-form-urlencoded"
                     }
                 });
-                if (!submit.data) {
+                if (!submit.data.data) {
                     return Promise.reject(new Error("제출 API 호출에 실패했어요."));
                 }
+
+                await refreshTreeView();
 
                 if (r.submit_mode) {
                     vscode.window.showInformationMessage("코드를 제출했습니다.");
@@ -603,45 +653,6 @@ export async function activate(context: vscode.ExtensionContext) {
                 } else {
                     vscode.window.showErrorMessage("오답입니다.");
                 }
-                //#endregion
-
-                //#region treeView 새로고침 코드
-                const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
-                const learn = await axios.get<APILearn>(goormUrl + "/api/learn", {
-                    "headers": {
-                        "cookie": stringifyCookie(JSON.parse(cookieString))
-                    },
-                    "withCredentials": true,
-                    "params": {
-                        "sequence": seq
-                    }
-                });
-                const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
-                if (!curriculum) throw new Error("커리큘럼을 찾을 수 없어요.");
-                const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
-                if (!lesson) throw new Error("과제를 찾을 수 없어요.");
-
-                const treeItems = await treeProvider.getChildren();
-                const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
-                if (currIndexNumber === -1) throw new Error("커리큘럼을 찾을 수 없어요.");
-                const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
-                if (lessonIndexNumber === -1) throw new Error("과제를 찾을 수 없어요.");
-
-                treeProvider.changeItem(currIndexNumber, new TreeViewItem({
-                    ...treeItems[currIndexNumber],
-                    "icon": curriculum.allLessons === curriculum.completedLessons ? new vscode.ThemeIcon("check") : new vscode.ThemeIcon("folder-library")
-                }));
-                treeProvider.changeChildren(treeItems[currIndexNumber].id, lessonIndexNumber, new TreeViewItem({
-                    ...(await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index)))[lessonIndexNumber],
-                    "icon": (() => {
-                        if (lesson.score === 100) return new vscode.ThemeIcon("check");
-
-                        switch (lesson.type) {
-                            case 'contents': return new vscode.ThemeIcon("three-bars");
-                            default: return new vscode.ThemeIcon("file-code");
-                        }
-                    })()
-                }));
                 //#endregion
             } catch (err) {
                 const e = err as Error;
