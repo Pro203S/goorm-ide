@@ -748,26 +748,20 @@ export async function activate(context: vscode.ExtensionContext) {
                         return;
                     }
                     debugSocket.sendRaw("41");
-                    if (currentTerminalProvider)
-                        currentTerminalProvider.write("\r\n터미널이 종료되었습니다.");
-
-                    if (!currentTerminalDisposable) return;
-                    currentTerminalDisposable.dispose();
+                    debugSocket.close();
                 });
 
                 debugSocket.on("close", () => {
-                    if (!currentTerminalProvider || !currentTerminal || !currentTerminalDisposable) return;
+                    if (!currentTerminalProvider || !currentTerminalDisposable) return;
 
-                    currentTerminal.hide();
+                    if (currentTerminalProvider)
+                        currentTerminalProvider.write("\r\n프로세스가 종료되었습니다.");
+
                     currentTerminalDisposable.dispose();
-                    currentTerminalProvider.close();
-                    vscode.window.showInformationMessage("프로세스가 종료되었습니다.");
                     return;
                 });
 
                 await debugSocket.connect();
-
-                currentTerminalProvider.write("프로세스가 시작되었습니다.\r\n");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);

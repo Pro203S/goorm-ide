@@ -43,7 +43,7 @@ export default class DebugSocket {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("[goormEdu]", "DD", str);
+                console.log("[goormEdu]", "DebugDown", str);
 
                 if (str === "2") {
                     console.log("[goormEdu]", "DS 3");
@@ -90,7 +90,7 @@ export default class DebugSocket {
     async sendRaw(data: string) {
         if (!this.ws) throw new Error("not connected");
 
-        console.log("[goormEdu]", "DS", data);
+        console.log("[goormEdu]", "DebugSend", data);
         this.ws.send(data);
     }
 
@@ -98,7 +98,7 @@ export default class DebugSocket {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
-        console.log("[goormEdu]", "DS", payload);
+        console.log("[goormEdu]", "DebugSend", payload);
         this.ws.send(payload);
     }
 
