@@ -15,6 +15,15 @@ import SocketIO from './modules/SocketIO';
 import DebugSocket from './modules/DebugSocket';
 import DebugTerminal from './classes/DebugTerminal';
 
+axios.interceptors.response.use((config) => {
+    if (config.status < 300) {
+        console.log("goormEdu request", config.config.url, config.status);
+    } else {
+        console.log("goormEdu request", config.config.url, config.status, config.data);
+    }
+    return config;
+});
+
 let loggedIn: boolean = false;
 let goormTemp: string = path.join(os.tmpdir(), "goorm-ide");
 let selectedLectureIndex: string | undefined = undefined;
