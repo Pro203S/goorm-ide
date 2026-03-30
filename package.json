@@ -28,12 +28,12 @@
         "commands": [
             {
                 "command": "goorm-ide.firstRun",
-                "title": "구름EDU 첫 세팅",
+                "title": "첫 세팅",
                 "category": "구름EDU"
             },
             {
                 "command": "goorm-ide.login",
-                "title": "구름EDU로 로그인",
+                "title": "로그인",
                 "category": "구름EDU"
             },
             {
