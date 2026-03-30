@@ -528,6 +528,26 @@ export async function activate(context: vscode.ExtensionContext) {
 
                     quizSocket.off("close", closeListener);
                     const data = await quizSocket.waitUntil(event, 7000);
+
+                    const submit = await axios.post<{ data: boolean }>("https://sunrint-hs.goorm.io/api/log/tutorial/submit", new URLSearchParams({
+                        "tag": "submit",
+                        "lectureIndex": selectedLectureIndex,
+                        "lessonIndex": lessonIndex,
+                        "quizIndex": r.lesson.tutorial_quiz_index,
+                        "lectureType": r.lecture.type.toString(),
+                        "form": r.lesson.quiz_form,
+                        "lang": currentProject.language
+                    }).toString(), {
+                        "withCredentials": true,
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(session.accessToken)),
+                            "content-type": "application/x-www-form-urlencoded"
+                        }
+                    });
+                    if (!submit.data) {
+                        return Promise.reject(new Error("제출 API 호출에 실패했어요."));
+                    }
+
                     return Promise.resolve(data);
                 });
 
