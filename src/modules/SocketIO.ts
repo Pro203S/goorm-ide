@@ -51,14 +51,14 @@ export default class SocketIO {
                 
                 // ping
                 if (str === "2") {
-                    console.log("[goormEdu]", "SS 3");
+                    console.log("[goormEdu]", "SocketSend 3");
                     this.ws.send("3");
                     return;
                 }
 
                 // 연결 처리
                 if (str.startsWith("0")) {
-                    console.log("[goormEdu]", "SS 40");
+                    console.log("[goormEdu]", "SocketSend 40");
                     this.ws.send("40");
                     return;
                 }

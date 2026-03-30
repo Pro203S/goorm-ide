@@ -532,7 +532,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     const submit = await axios.post<{ data: boolean }>("https://sunrint-hs.goorm.io/api/log/tutorial/submit", new URLSearchParams({
                         "tag": "submit",
                         "lectureIndex": selectedLectureIndex,
-                        "lessonIndex": lessonIndex,
+                        "lessonIndex": r.lesson.index,
                         "quizIndex": r.lesson.tutorial_quiz_index,
                         "lectureType": r.lecture.type.toString(),
                         "form": r.lesson.quiz_form,
