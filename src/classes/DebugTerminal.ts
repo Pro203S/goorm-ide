@@ -18,7 +18,7 @@ export default class DebugTerminal implements vscode.Pseudoterminal {
 
     handleInput(data: string) {
         if (data === "\r")
-            return this.inputEmitter.fire("\r\n");
+            return this.inputEmitter.fire("\r");
         
         this.inputEmitter.fire(data);
     }

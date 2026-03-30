@@ -762,6 +762,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 });
 
                 await debugSocket.connect();
+
+                currentTerminalProvider.write("> ");
             } catch (err) {
                 const e = err as Error;
                 vscode.window.showErrorMessage("구름EDU: " + e.message);
