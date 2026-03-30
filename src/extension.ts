@@ -822,6 +822,9 @@ export async function activate(context: vscode.ExtensionContext) {
             );
         }),
         vscode.workspace.onWillSaveTextDocument((e) => {
+            if (!selectedLectureIndex) return;
+            if (!currentQuizUrl || !currentProject) return;
+
             e.waitUntil(new Promise<void>(async (resolve, reject) => {
                 try {
                     await vscode.window.withProgress({
@@ -841,10 +844,10 @@ export async function activate(context: vscode.ExtensionContext) {
                             return Promise.reject(new Error("재로그인해주세요!"));
                         }
 
+                        const session: vscode.AuthenticationSession = JSON.parse(rawSession);
+
                         if (!selectedLectureIndex) return Promise.reject(new Error("수업을 선택해주세요!"));
                         if (!currentQuizUrl || !currentProject) return Promise.reject(new Error("과제를 선택해주세요!"));
-
-                        const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
                         const r = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
 

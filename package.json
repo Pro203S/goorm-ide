@@ -2,7 +2,7 @@
     "name": "goorm-ide",
     "displayName": "goorm-ide",
     "description": "goorm ide in vscode",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "engines": {
         "vscode": "^1.110.0"
     },
@@ -12,6 +12,11 @@
     "activationEvents": [
         "onStartupFinished"
     ],
+    "license": "GPL-3.0-only",
+    "repository": {
+        "url": "https://github.com/Pro203S/goorm-ide",
+        "type": "git"
+    },
     "main": "./out/extension.js",
     "contributes": {
         "authentication": [
