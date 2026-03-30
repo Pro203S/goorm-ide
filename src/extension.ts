@@ -661,7 +661,32 @@ export async function activate(context: vscode.ExtensionContext) {
                         "sid": sid
                     }
                 });
-                if (pollingMustBeOk.data !== "ok") throw new Error("예기치 않은 문제가 발생했어요.");
+                if (pollingMustBeOk.data !== "ok") throw new Error("예기치 않은 문제가 발생했어요. (polling)");
+
+                const pollingRun = await axios.post<string>(socketUrl, `42${JSON.stringify([
+                    "run",
+                    {
+                        "token": containerComplete.token,
+                        "daemon": containerComplete.daemon,
+                        "app": containerComplete.app,
+                        "main": containerComplete.main,
+                        "run_option": containerComplete.run_option,
+                        "stat": false,
+                        "tty_mode": false,
+                        "collaboration": true
+                    }
+                ])}`, {
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(session.accessToken))
+                    },
+                    "params": {
+                        "EIO": 4,
+                        "transport": "polling",
+                        "t": date36radix(),
+                        "sid": sid
+                    }
+                });
+                if (pollingRun.data !== "ok") throw new Error("예기치 않은 문제가 발생했어요. (run)");
 
                 debugSocket = new DebugSocket(
                     socketUrl,
