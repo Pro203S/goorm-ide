@@ -35,6 +35,7 @@ export default class SocketIO {
         );
 
         this.ws.on("close", (code, reason) => {
+            console.log("[goormEdu]", "SocketClosed", code, Buffer.from(reason).toString("utf-8"));
             if (code - 1000 < 1000) return;
 
             this.emitLocal("close", { code, reason });
@@ -46,15 +47,18 @@ export default class SocketIO {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
+                console.log("[goormEdu]", "SD", str);
                 
                 // ping
                 if (str === "2") {
+                    console.log("[goormEdu]", "SS 3");
                     this.ws.send("3");
                     return;
                 }
 
                 // 연결 처리
                 if (str.startsWith("0")) {
+                    console.log("[goormEdu]", "SS 40");
                     this.ws.send("40");
                     return;
                 }
@@ -98,6 +102,7 @@ export default class SocketIO {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
+        console.log("[goormEdu]", "SS", payload);
         this.ws.send(payload);
     }
 

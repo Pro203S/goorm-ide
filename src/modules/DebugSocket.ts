@@ -18,17 +18,19 @@ export default class DebugSocket {
         this.ws = new WebSocket(`${wsUrl}/?EIO=4&transport=websocket&sid=${this.sid}`);
 
         this.ws.on("error", (e) => {
-            console.error("DEBUG SOCKET", e);
+            console.error("[goormEdu] DEBUG SOCKET", e);
             this.emitLocal("error", e);
             this.close();
         });
 
         this.ws.on("close", (code, reason) => {
+            console.log("[goormEdu]", "DebugSocketClose", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
 
         this.ws.on("open", () => {
             try {
+                console.log("[goormEdu]", "DS 2probe");
                 this.ws.send("2probe");
             } catch (err) {
                 const e = err as Error;
@@ -41,8 +43,10 @@ export default class DebugSocket {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
+                console.log("[goormEdu]", "DD", str);
 
                 if (str === "2") {
+                    console.log("[goormEdu]", "DS 3");
                     this.ws.send("3");
                     return;
                 }
@@ -63,6 +67,7 @@ export default class DebugSocket {
                 try {
                     const str = msg.toString();
                     if (str === "3probe") {
+                        console.log("[goormEdu]", "DS 5");
                         this.ws.send("5");
                         return;
                     }
@@ -86,6 +91,7 @@ export default class DebugSocket {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
+        console.log("[goormEdu]", "DS", payload);
         this.ws.send(payload);
     }
 

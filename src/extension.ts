@@ -38,7 +38,7 @@ axios.interceptors.request.use((config) => {
 });
 
 axios.interceptors.response.use((config) => {
-    console.log("[goormEdu] request", config.config.url, config.status);
+    console.log("[goormEdu]", config.config.method ?? "get", config.config.url, config.status);
     return config;
 });
 
@@ -89,7 +89,6 @@ export async function activate(context: vscode.ExtensionContext) {
             const session: vscode.AuthenticationSession = JSON.parse(rawSession);
 
             const r = await getInitialState(goormUrl, JSON.parse(session.accessToken));
-            console.log(r);
 
             loggedIn = true;
             treeProvider.addItem(new TreeViewItem({
@@ -495,7 +494,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     if (!quizSocket || !document || !currentQuizUrl || !currentProject) return Promise.reject(new Error("과제를 선택해주세요!"));
 
                     const closeListener = ({ code, reason }: { code: number, reason: Buffer }) => {
-                        console.log(code, reason);
+                        console.log("[goormEdu] quizSocketClosed", code, reason);
                         return Promise.reject(new Error(code + " " + Buffer.from(reason).toString("utf-8")));
                     };
                     quizSocket.once("close", closeListener);
@@ -675,8 +674,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const pollingSidData = JSON.parse(pollingSid.data.slice(1));
                 const sid = pollingSidData.sid;
-                console.log("debug socket sid:", sid);
-                console.log("container:", containerComplete);
 
                 const pollingMustBeOk = await axios.post<string>(socketUrl, "40", {
                     "headers": {
@@ -742,7 +739,6 @@ export async function activate(context: vscode.ExtensionContext) {
                         return;
                     }
 
-                    console.log(data);
                     currentTerminalProvider.write(data.stdout);
                 });
 
