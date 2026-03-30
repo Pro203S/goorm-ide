@@ -596,7 +596,7 @@ declare global {
         "solved": boolean,
         "all_pass": boolean,
         "isStateUpdated": boolean,
-        "quizState": boolean,
+        "quizState"?: number,
         "score"?: number,
         "total_score"?: number,
         "submit_mode"?: boolean

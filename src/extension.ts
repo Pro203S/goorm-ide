@@ -56,6 +56,7 @@ let currentTerminalProvider: DebugTerminal | undefined = undefined;
 let currentTerminalDisposable: vscode.Disposable | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
+    //#region 기본 세팅 
     if (!fs.existsSync(goormTemp))
         fs.mkdirSync(goormTemp);
 
@@ -103,6 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage("구름EDU: " + e.message + "\n재로그인 해주세요.");
         }
     };
+    //#endregion
 
     // 명령어 푸시
     context.subscriptions.push(
@@ -268,7 +270,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     sequence = lectureId.value;
                 }
 
-                const r = await axios.get<APILearn>("https://sunrint-hs.goorm.io/api/learn", {
+                const r = await axios.get<APILearn>(goormUrl + "/api/learn", {
                     "headers": {
                         "cookie": stringifyCookie(JSON.parse(session.accessToken))
                     },
@@ -358,7 +360,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         quizSocket.close();
                     }
 
-                    const r = await axios.get<APIWorkspaceLesson>("https://sunrint-hs.goorm.io/api/workspace/lesson", {
+                    const r = await axios.get<APIWorkspaceLesson>(goormUrl + "/api/workspace/lesson", {
                         "withCredentials": true,
                         "headers": {
                             "cookie": stringifyCookie(JSON.parse(session.accessToken))
@@ -529,7 +531,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     quizSocket.off("close", closeListener);
                     const data = await quizSocket.waitUntil(event, 7000);
 
-                    const submit = await axios.post<{ data: boolean }>("https://sunrint-hs.goorm.io/api/log/tutorial/submit", new URLSearchParams({
+                    const submit = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/submit", new URLSearchParams({
                         "tag": "submit",
                         "lectureIndex": selectedLectureIndex,
                         "lessonIndex": r.lesson.index,
@@ -557,7 +559,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
 
                 const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
-                const learn = await axios.get<APILearn>("https://sunrint-hs.goorm.io/api/learn", {
+                const learn = await axios.get<APILearn>(goormUrl + "/api/learn", {
                     "headers": {
                         "cookie": stringifyCookie(JSON.parse(cookieString))
                     },
@@ -593,7 +595,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     })()
                 }));
 
-                if (!r.solved && r.saved) {
+                if (r.quizState === undefined) {
                     vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
                     return;
                 }
@@ -871,7 +873,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                         const r = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
 
-                        const saveStatus = await axios.post("https://sunrint-hs.goorm.io/api/workspace/save", {
+                        const saveStatus = await axios.post(goormUrl + "/api/workspace/save", {
                             "lectureIndex": r.lecture.index,
                             "examIndex": r.lesson.index,
                             "quizIndex": r.lesson.tutorial_quiz_index,
