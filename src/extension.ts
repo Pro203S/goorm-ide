@@ -26,6 +26,7 @@ let changeSelectionEvent: vscode.Disposable | undefined = undefined;
 let changeSelection: TreeViewItem | undefined = undefined;
 let currentTerminal: vscode.Terminal | undefined = undefined;
 let currentTerminalProvider: DebugTerminal | undefined = undefined;
+let currentTerminalDisposable: vscode.Disposable | undefined = undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     if (!fs.existsSync(goormTemp))
@@ -592,6 +593,18 @@ export async function activate(context: vscode.ExtensionContext) {
                     debugSocket.close();
                 }
 
+                if (currentTerminal) {
+                    currentTerminal.dispose();
+                }
+
+                if (currentTerminalProvider) {
+                    currentTerminalProvider.close();
+                }
+
+                if (currentTerminalDisposable) {
+                    currentTerminalDisposable.dispose();
+                }
+
                 const date36radix = () => new Date().getTime().toString(36);
                 const socketUrl = `${containerSocket.options.secure ? "https" : "http"}://${containerSocket.url}${containerSocket.options.path}/`;
                 const pollingSid = await axios.get<string>(socketUrl, {
@@ -626,8 +639,30 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 currentTerminal.show();
 
-                debugSocket.on("pty_execute_command", (data) => {
-                    
+                currentTerminalDisposable = currentTerminalProvider.onDidWrite((e) => {
+                    console.log("sending pty_execute_command", e);
+                    debugSocket?.send("pty_execute_command", {
+                        "index": containerComplete.token,
+                        "command": e
+                    });
+                });
+
+                debugSocket.on("pty_command_result", (data) => {
+                    if (!currentTerminalProvider) {
+                        vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
+                        return;
+                    }
+
+                    console.log(data);
+                    currentTerminalProvider.write(data.stdout);
+                });
+
+                debugSocket.on("terminal_exited." + containerComplete.token, () => {
+                    if (currentTerminalProvider)
+                        currentTerminalProvider.write("\r\n터미널이 종료되었습니다.");
+
+                    if (!currentTerminalDisposable) return;
+                    currentTerminalDisposable.dispose();
                 });
 
                 await debugSocket.connect();

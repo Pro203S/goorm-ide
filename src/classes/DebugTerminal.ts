@@ -18,8 +18,7 @@ export default class DebugTerminal implements vscode.Pseudoterminal {
     }
 
     handleInput(data: string) {
-        const char = data.trim();
-
+        this.writeEmitter.fire(data);
     }
 
     close() {
