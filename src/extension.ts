@@ -587,6 +587,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 const session: vscode.AuthenticationSession = JSON.parse(rawSession);
                 const state = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
 
+                quizSocket.send("run_in_collaboration", {
+                    "type": "term",
+                    "target": currentProject.label
+                });
+
                 quizSocket.send("build_in_container", {
                     "filetype": currentProject.mainFiletype,
                     "form": state.lesson.quiz_form,
@@ -642,6 +647,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 const pollingSidData = JSON.parse(pollingSid.data.slice(1));
                 const sid = pollingSidData.sid;
+                console.log("debug socket sid:", sid);
+                console.log("container:", containerComplete);
 
                 const pollingMustBeOk = await axios.post<string>(socketUrl, "40", {
                     "headers": {
@@ -692,6 +699,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
                     if (!currentTerminalDisposable) return;
                     currentTerminalDisposable.dispose();
+                });
+
+                debugSocket.on("close", () => {
+                    if (!currentTerminalProvider || !currentTerminal || !currentTerminalDisposable) return;
+
+                    currentTerminal.hide();
+                    currentTerminalDisposable.dispose();
+                    currentTerminalProvider.close();
+                    vscode.window.showInformationMessage("프로세스가 종료되었습니다.");
+                    return;
                 });
 
                 await debugSocket.connect();

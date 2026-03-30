@@ -37,7 +37,6 @@ export default class SocketIO {
         this.ws.on("close", (code, reason) => {
             if (code - 1000 < 1000) return;
 
-            console.log("Goorm socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
 
@@ -47,8 +46,7 @@ export default class SocketIO {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("D", str);
-
+                
                 // ping
                 if (str === "2") {
                     this.ws.send("3");

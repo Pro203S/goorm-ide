@@ -24,14 +24,11 @@ export default class DebugSocket {
         });
 
         this.ws.on("close", (code, reason) => {
-            console.log("Debug socket closed", code, Buffer.from(reason).toString("utf-8"));
             this.emitLocal("close", { code, reason });
         });
 
         this.ws.on("open", () => {
             try {
-                console.log("debug socket open");
-                console.log("DEBUG S", "2probe");
                 this.ws.send("2probe");
             } catch (err) {
                 const e = err as Error;
@@ -44,10 +41,8 @@ export default class DebugSocket {
         this.ws.on("message", (msg) => {
             try {
                 const str = msg.toString();
-                console.log("DEBUG D", str);
 
                 if (str === "2") {
-                    console.log("DEBUG S", "3");
                     this.ws.send("3");
                     return;
                 }
@@ -68,13 +63,11 @@ export default class DebugSocket {
                 try {
                     const str = msg.toString();
                     if (str === "3probe") {
-                        console.log("DEBUG S", "5");
                         this.ws.send("5");
                         return;
                     }
 
                     if (str.startsWith("40")) {
-                        console.log("Debug connected");
                         resolve();
                         this.ws.off("message", listener);
                         return;
@@ -93,7 +86,6 @@ export default class DebugSocket {
         if (!this.ws) throw new Error("not connected");
 
         const payload = `42${JSON.stringify([event, data])}`;
-        console.log("DEBUG S", payload);
         this.ws.send(payload);
     }
 
