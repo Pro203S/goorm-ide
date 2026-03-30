@@ -598,7 +598,8 @@ declare global {
         "isStateUpdated": boolean,
         "quizState": boolean,
         "score"?: number,
-        "total_score"?: number
+        "total_score"?: number,
+        "submit_mode"?: boolean
     };
 
     type ContainerCompleteResponse = {

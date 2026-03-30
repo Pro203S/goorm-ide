@@ -531,10 +531,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     return Promise.resolve(data);
                 });
 
-                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("알 수 없는 오류가 발생했어요. 1");
+                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("과제를 다시 선택해주세요.");
 
-                if (!changeSelection.command) throw new Error("알 수 없는 오류가 발생했어요. 2");
-                if (!changeSelection.command.arguments) throw new Error("알 수 없는 오류가 발생했어요. 3");
+                if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
+                if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
 
                 const [lectureIndex, lessonIndex, _, seq] = changeSelection.command.arguments;
                 const learn = await axios.get<APILearn>("https://sunrint-hs.goorm.io/api/learn", {
@@ -547,15 +547,15 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 });
                 const curriculum = learn.data.curriculumData.find(v => v.index === lectureIndex);
-                if (!curriculum) throw new Error("알 수 없는 오류가 발생했어요. 4");
+                if (!curriculum) throw new Error("커리큘럼을 찾을 수 없어요.");
                 const lesson = curriculum.lessons.find(v => v.index === lessonIndex);
-                if (!lesson) throw new Error("알 수 없는 오류가 발생했어요. 5");
+                if (!lesson) throw new Error("과제를 찾을 수 없어요.");
 
                 const treeItems = await treeProvider.getChildren();
                 const currIndexNumber = treeItems.findIndex(v => v.id === curriculum.index);
-                if (currIndexNumber === -1) throw new Error("알 수 없는 오류가 발생했어요. 6");
+                if (currIndexNumber === -1) throw new Error("커리큘럼을 찾을 수 없어요.");
                 const lessonIndexNumber = (await treeProvider.getChildren(treeItems.find(v => v.id === curriculum.index))).findIndex(v => v.id === lesson.index);
-                if (lessonIndexNumber === -1) throw new Error("알 수 없는 오류가 발생했어요. 7");
+                if (lessonIndexNumber === -1) throw new Error("과제를 찾을 수 없어요.");
 
                 treeProvider.changeItem(currIndexNumber, new TreeViewItem({
                     ...treeItems[currIndexNumber],
@@ -572,6 +572,11 @@ export async function activate(context: vscode.ExtensionContext) {
                         }
                     })()
                 }));
+
+                if (r.submit_mode) {
+                    vscode.window.showInformationMessage("코드를 제출했습니다.");
+                    return;
+                }
 
                 if (r.solved) {
                     vscode.window.showInformationMessage("정답입니다.");
