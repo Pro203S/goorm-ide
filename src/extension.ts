@@ -743,6 +743,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 });
 
                 debugSocket.on("terminal_exited." + containerComplete.token, () => {
+                    if (!debugSocket) {
+                        vscode.window.showErrorMessage("예기치 않은 오류가 발생했어요.");
+                        return;
+                    }
+                    debugSocket.sendRaw("41");
                     if (currentTerminalProvider)
                         currentTerminalProvider.write("\r\n터미널이 종료되었습니다.");
 

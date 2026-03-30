@@ -87,6 +87,13 @@ export default class DebugSocket {
         });
     }
 
+    async sendRaw(data: string) {
+        if (!this.ws) throw new Error("not connected");
+
+        console.log("[goormEdu]", "DS", data);
+        this.ws.send(data);
+    }
+
     async send(event: string, data: any) {
         if (!this.ws) throw new Error("not connected");
 
