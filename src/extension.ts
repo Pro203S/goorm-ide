@@ -475,6 +475,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("goorm-ide.submitQuiz", async () => {
             try {
                 let cookieString: string | undefined = undefined;
+                let currentState: LessonInitialState | undefined = undefined;
                 if (changeSelectionEvent)
                     changeSelectionEvent.dispose();
 
@@ -509,6 +510,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     quizSocket.once("close", closeListener);
 
                     const r = await getInitialState<LessonInitialState>(currentQuizUrl, JSON.parse(session.accessToken));
+                    currentState = r;
                     cookieString = session.accessToken;
 
                     const event = "/submit_quiz/" + r.lesson.quiz_form;
@@ -531,29 +533,17 @@ export async function activate(context: vscode.ExtensionContext) {
                     quizSocket.off("close", closeListener);
                     const data = await quizSocket.waitUntil(event, 7000);
 
-                    const submit = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/submit", new URLSearchParams({
-                        "tag": "submit",
-                        "lectureIndex": selectedLectureIndex,
-                        "lessonIndex": r.lesson.index,
-                        "quizIndex": r.lesson.tutorial_quiz_index,
-                        "lectureType": r.lecture.type.toString(),
-                        "form": r.lesson.quiz_form,
-                        "lang": currentProject.language
-                    }).toString(), {
-                        "withCredentials": true,
-                        "headers": {
-                            "cookie": stringifyCookie(JSON.parse(session.accessToken)),
-                            "content-type": "application/x-www-form-urlencoded"
-                        }
-                    });
-                    if (!submit.data) {
-                        return Promise.reject(new Error("제출 API 호출에 실패했어요."));
-                    }
-
                     return Promise.resolve(data);
                 });
 
-                if (!currentQuizUrl || !cookieString || !changeSelection) throw new Error("과제를 다시 선택해주세요.");
+                if (
+                    !currentQuizUrl ||
+                    !cookieString ||
+                    !changeSelection ||
+                    currentState === undefined ||
+                    !currentProject ||
+                    !selectedLectureIndex
+                ) throw new Error("과제를 다시 선택해주세요.");
 
                 if (!changeSelection.command) throw new Error("과제를 다시 선택해주세요.");
                 if (!changeSelection.command.arguments) throw new Error("과제를 다시 선택해주세요.");
@@ -595,9 +585,48 @@ export async function activate(context: vscode.ExtensionContext) {
                     })()
                 }));
 
+                const state: LessonInitialState = currentState;
+
                 if (r.quizState === undefined) {
+                    const run = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/run", new URLSearchParams({
+                        "tag": "submit",
+                        "lectureIndex": selectedLectureIndex,
+                        "lessonIndex": state.lesson.index,
+                        "quizIndex": state.lesson.tutorial_quiz_index,
+                        "lectureType": state.lecture.type.toString(),
+                        "form": state.lesson.quiz_form,
+                        "lang": currentProject.language
+                    }).toString(), {
+                        "withCredentials": true,
+                        "headers": {
+                            "cookie": stringifyCookie(JSON.parse(cookieString)),
+                            "content-type": "application/x-www-form-urlencoded"
+                        }
+                    });
+                    if (!run.data) {
+                        return Promise.reject(new Error("제출 API 호출에 실패했어요."));
+                    }
                     vscode.window.showInformationMessage("코드를 제출할 필요가 없는 과제입니다.");
                     return;
+                }
+
+                const submit = await axios.post<{ data: boolean }>(goormUrl + "/api/log/tutorial/submit", new URLSearchParams({
+                    "tag": "submit",
+                    "lectureIndex": selectedLectureIndex,
+                    "lessonIndex": state.lesson.index,
+                    "quizIndex": state.lesson.tutorial_quiz_index,
+                    "lectureType": state.lecture.type.toString(),
+                    "form": state.lesson.quiz_form,
+                    "lang": currentProject.language
+                }).toString(), {
+                    "withCredentials": true,
+                    "headers": {
+                        "cookie": stringifyCookie(JSON.parse(cookieString)),
+                        "content-type": "application/x-www-form-urlencoded"
+                    }
+                });
+                if (!submit.data) {
+                    return Promise.reject(new Error("제출 API 호출에 실패했어요."));
                 }
 
                 if (r.submit_mode) {
