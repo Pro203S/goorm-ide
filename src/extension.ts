@@ -820,6 +820,15 @@ export async function activate(context: vscode.ExtensionContext) {
                         });
                     });
 
+                    debugSocket.on("terminal_error", (data) => {
+                        if (!currentTerminalProvider) {
+                            vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
+                            return;
+                        }
+
+                        currentTerminalProvider.write(data.err_msg);
+                    });
+
                     debugSocket.on("pty_command_result", (data) => {
                         if (!currentTerminalProvider) {
                             vscode.window.showErrorMessage("터미널에 메시지를 쓰지 못했어요.");
